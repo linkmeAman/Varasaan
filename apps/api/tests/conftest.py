@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+import base64
+import importlib
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+
+class FakeAwsService:
+    def __init__(self) -> None:
+        self.uploaded: dict[tuple[str, str], bytes] = {}
+
+    async def generate_data_key(self, *, encryption_context: dict[str, str]):
+        _ = encryption_context
+        plaintext = b"0" * 32
+        encrypted = b"encrypted-dek"
+        return SimpleNamespace(
+            plaintext_key_b64=base64.b64encode(plaintext).decode("ascii"),
+            encrypted_key_b64=base64.b64encode(encrypted).decode("ascii"),
+            kms_key_id="alias/test-kms",
+        )
+
+    async def presign_upload(self, *, object_key: str, expires_seconds: int, content_type: str, bucket: str | None = None) -> str:
+        target_bucket = bucket or "documents"
+        return f"https://s3.local/{target_bucket}/{object_key}?upload=1&expires={expires_seconds}&content_type={content_type}"
+
+    async def presign_download(self, *, object_key: str, expires_seconds: int, bucket: str | None = None) -> str:
+        target_bucket = bucket or "documents"
+        return f"https://s3.local/{target_bucket}/{object_key}?download=1&expires={expires_seconds}"
+
+    async def upload_bytes(self, *, bucket: str, object_key: str, payload: bytes, content_type: str = "application/octet-stream") -> None:
+        _ = content_type
+        self.uploaded[(bucket, object_key)] = payload
+
+
+class FakeMalwareClient:
+    async def scan_object(self, *, object_url: str, object_key: str, version_id: str):
+        _ = (object_url, object_key, version_id)
+        return SimpleNamespace(scan_passed=True, summary="clean", provider_scan_id="scan_test_1")
+
+
+@pytest.fixture()
+async def test_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    db_path = tmp_path / "test.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("DEBUG", "true")
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key")
+    monkeypatch.setenv("CELERY_TASK_ALWAYS_EAGER", "true")
+    monkeypatch.setenv("RAZORPAY_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setenv("OPENAPI_CONTRACT_PATH", "packages/shared/openapi/openapi.yaml")
+
+    from app.core.config import get_settings
+    from app.db.session import get_engine, get_session_factory
+    from app.integrations.aws import get_aws_storage_crypto_service
+    from app.integrations.malware_scan import get_malware_scan_client
+
+    get_settings.cache_clear()
+    get_engine.cache_clear()
+    get_session_factory.cache_clear()
+    get_aws_storage_crypto_service.cache_clear()
+    get_malware_scan_client.cache_clear()
+
+    import app.main as app_main
+
+    app_main = importlib.reload(app_main)
+    app = app_main.app
+
+    from app.db.base import Base
+
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    fake_aws = FakeAwsService()
+    fake_malware = FakeMalwareClient()
+    monkeypatch.setattr("app.api.deps.get_redis_client", lambda: None)
+    monkeypatch.setattr("app.services.documents.get_aws_storage_crypto_service", lambda: fake_aws)
+    monkeypatch.setattr("app.services.exports.get_aws_storage_crypto_service", lambda: fake_aws)
+    monkeypatch.setattr("app.services.packets.get_aws_storage_crypto_service", lambda: fake_aws)
+    monkeypatch.setattr("app.services.documents.get_malware_scan_client", lambda: fake_malware)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        yield {
+            "client": client,
+            "session_factory": get_session_factory(),
+            "fake_aws": fake_aws,
+            "webhook_secret": "whsec_test",
+        }
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
