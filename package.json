@@ -1,0 +1,22 @@
+{
+  "name": "varasaan-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "prepare": "husky",
+    "lint:pr-title": "node ./scripts/ci/lint-pr-title.mjs",
+    "lint:commitmsg": "commitlint --edit"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "19.8.0",
+    "@commitlint/config-conventional": "19.8.0",
+    "@semantic-release/changelog": "6.0.3",
+    "@semantic-release/commit-analyzer": "11.1.0",
+    "@semantic-release/exec": "6.0.3",
+    "@semantic-release/git": "10.0.1",
+    "@semantic-release/github": "10.3.5",
+    "@semantic-release/release-notes-generator": "12.1.0",
+    "husky": "9.1.7",
+    "semantic-release": "23.1.1"
+  }
+}

@@ -1,0 +1,16 @@
+project_name             = "varasaan"
+aws_region               = "ap-south-1"
+vpc_id                   = "vpc-xxxxxxxx"
+public_subnet_ids        = ["subnet-public-a", "subnet-public-b"]
+private_subnet_ids       = ["subnet-private-a", "subnet-private-b"]
+web_bucket_name          = "varasaan-production-web"
+github_repository        = "owner/varasaan"
+github_oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+
+api_task_environment = {
+  ENV = "production"
+}
+
+runtime_parameters = {
+  DATABASE_URL = "postgresql://..."
+}

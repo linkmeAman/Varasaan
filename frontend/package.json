@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "typecheck": "tsc -b --pretty false",
+    "test:smoke": "npx --yes vitest@3.2.4 run tests/smoke.test.js",
+    "generate:api": "python ./scripts/generate_api_client.py && node ./scripts/generate-openapi-types.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -33,3 +36,5 @@
     "vite": "^7.3.1"
   }
 }
+
+

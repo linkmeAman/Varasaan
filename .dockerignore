@@ -1,0 +1,10 @@
+.git
+.github
+.vscode
+frontend/node_modules
+frontend/dist
+backend/.pytest_cache
+backend/.mypy_cache
+backend/.ruff_cache
+backend/.alembic_test.db
+**/__pycache__

@@ -4,7 +4,9 @@ import pytest
 from sqlalchemy import select
 
 from app.models import Document, DocumentState
-from tests.helpers import mark_user_verified, seed_active_policies, sign_webhook
+from helpers import mark_user_verified, seed_active_policies, sign_webhook
+
+pytestmark = pytest.mark.integration
 
 
 def _auth_header(access_token: str) -> dict[str, str]:
@@ -220,3 +222,5 @@ async def test_payment_webhook_replay_and_out_of_order_handling(test_context):
     body = payment_status.json()
     assert body["status"] == "captured"
     assert body["event_sequence"] == 1
+
+

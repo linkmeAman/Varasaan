@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     env: Literal["local", "staging", "production"] = "local"
     api_prefix: str = "/api/v1"
     debug: bool = False
-    openapi_contract_path: str = "packages/shared/openapi/openapi.yaml"
+    openapi_contract_path: str = "packages/shared/openapi/openapi.generated.json"
 
     database_url: str = "postgresql+asyncpg://varasaan:varasaan@localhost:5432/varasaan"
     redis_url: str = "redis://localhost:6379/0"
@@ -97,3 +97,4 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+

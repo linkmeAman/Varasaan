@@ -10,9 +10,8 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, error, helperText, id, ...props }, ref) => {
-    
-    // Auto-generate ID if none provided for label linking
-    const inputId = id || React.useId();
+    const generatedId = React.useId();
+    const inputId = id ?? generatedId;
 
     return (
       <div className="input-wrapper">
@@ -21,22 +20,19 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             {label} {props.required && <span className="input-required">*</span>}
           </label>
         )}
-        
+
         <input
           id={inputId}
           ref={ref}
-          className={cn(
-            'input-field',
-            error && 'input-error',
-            className
-          )}
+          className={cn('input-field', error && 'input-error', className)}
           {...props}
         />
-        
+
         {error && <p className="input-error-msg">{error}</p>}
         {helperText && !error && <p className="input-helper-msg">{helperText}</p>}
       </div>
     );
   }
 );
+
 Input.displayName = 'Input';

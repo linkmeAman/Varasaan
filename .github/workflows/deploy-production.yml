@@ -1,0 +1,241 @@
+name: deploy-production
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
+
+concurrency:
+  group: deploy-production-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fetch-release-manifest:
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      release_commit_sha: ${{ steps.manifest.outputs.release_commit_sha }}
+      release_tag: ${{ steps.manifest.outputs.release_tag }}
+    steps:
+      - name: Download release manifest and frontend artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "release-manifest.json" \
+            --pattern "frontend-dist-${GITHUB_REF_NAME}.tar.gz"
+
+      - name: Parse and validate manifest
+        id: manifest
+        run: |
+          release_tag=$(jq -r '.release_tag' release-manifest.json)
+          release_sha=$(jq -r '.release_commit_sha' release-manifest.json)
+
+          if [ "$release_tag" != "${GITHUB_REF_NAME}" ]; then
+            echo "Release manifest tag $release_tag does not match pushed tag ${GITHUB_REF_NAME}."
+            exit 1
+          fi
+
+          if [ -z "$release_sha" ] || [ "$release_sha" = "null" ]; then
+            echo "release_commit_sha is missing from release-manifest.json"
+            exit 1
+          fi
+
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "release_commit_sha=$release_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Upload frontend artifact for deploy job
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist-${{ github.ref_name }}
+          path: frontend-dist-${{ github.ref_name }}.tar.gz
+
+  build-backend-image:
+    runs-on: ubuntu-latest
+    environment: production
+    needs: fetch-release-manifest
+    outputs:
+      image_uri: ${{ steps.image.outputs.image_uri }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.fetch-release-manifest.outputs.release_commit_sha }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PRODUCTION_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ vars.PROD_ECR_REPOSITORY }}:${{ github.ref_name }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ vars.PROD_ECR_REPOSITORY }}:${{ needs.fetch-release-manifest.outputs.release_commit_sha }}
+
+      - id: image
+        run: |
+          echo "image_uri=${{ steps.login-ecr.outputs.registry }}/${{ vars.PROD_ECR_REPOSITORY }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
+
+  run-migrations:
+    runs-on: ubuntu-latest
+    environment: production
+    needs: build-backend-image
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PRODUCTION_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run Alembic migration task
+        run: |
+          subnets_json=$(printf '%s' "${{ vars.PROD_PRIVATE_SUBNETS }}" | jq -R 'split(",")')
+          sgs_json=$(printf '%s' "${{ vars.PROD_SECURITY_GROUPS }}" | jq -R 'split(",")')
+          network_config=$(jq -n --argjson subnets "$subnets_json" --argjson sgs "$sgs_json" '{awsvpcConfiguration:{subnets:$subnets,securityGroups:$sgs,assignPublicIp:"DISABLED"}}')
+
+          task_arn=$(aws ecs run-task \
+            --cluster "${{ vars.PROD_ECS_CLUSTER }}" \
+            --task-definition "${{ vars.PROD_MIGRATION_TASK_DEFINITION }}" \
+            --launch-type FARGATE \
+            --count 1 \
+            --network-configuration "$network_config" \
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          if [ "$task_arn" = "None" ] || [ -z "$task_arn" ]; then
+            echo "Failed to start migration task."
+            exit 1
+          fi
+
+          aws ecs wait tasks-stopped --cluster "${{ vars.PROD_ECS_CLUSTER }}" --tasks "$task_arn"
+
+          exit_code=$(aws ecs describe-tasks \
+            --cluster "${{ vars.PROD_ECS_CLUSTER }}" \
+            --tasks "$task_arn" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+
+          if [ "$exit_code" != "0" ]; then
+            echo "Migration task failed with exit code $exit_code"
+            exit 1
+          fi
+
+  deploy-backend:
+    runs-on: ubuntu-latest
+    environment: production
+    needs:
+      - build-backend-image
+      - run-migrations
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PRODUCTION_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Register task definition with immutable image digest
+        id: taskdef
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${{ vars.PROD_TASK_DEFINITION_FAMILY }}" \
+            --query taskDefinition > task-definition.json
+
+          jq 'del(
+            .taskDefinitionArn,
+            .revision,
+            .status,
+            .requiresAttributes,
+            .compatibilities,
+            .registeredAt,
+            .registeredBy
+          )' task-definition.json > task-definition.stripped.json
+
+          jq --arg IMAGE "${{ needs.build-backend-image.outputs.image_uri }}" --arg CONTAINER "${{ vars.PROD_TASK_CONTAINER_NAME }}" '
+            .containerDefinitions |= map(if .name == $CONTAINER then .image = $IMAGE else . end)
+          ' task-definition.stripped.json > task-definition.updated.json
+
+          register_output=$(aws ecs register-task-definition --cli-input-json file://task-definition.updated.json)
+          new_task_def_arn=$(echo "$register_output" | jq -r '.taskDefinition.taskDefinitionArn')
+          echo "task_definition_arn=$new_task_def_arn" >> "$GITHUB_OUTPUT"
+
+      - name: Update ECS service and wait for stability
+        run: |
+          aws ecs update-service \
+            --cluster "${{ vars.PROD_ECS_CLUSTER }}" \
+            --service "${{ vars.PROD_ECS_SERVICE }}" \
+            --task-definition "${{ steps.taskdef.outputs.task_definition_arn }}"
+
+          aws ecs wait services-stable \
+            --cluster "${{ vars.PROD_ECS_CLUSTER }}" \
+            --services "${{ vars.PROD_ECS_SERVICE }}"
+
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    environment: production
+    needs:
+      - fetch-release-manifest
+      - deploy-backend
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist-${{ github.ref_name }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PRODUCTION_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Extract frontend artifact
+        run: |
+          mkdir -p frontend-dist
+          tar -xzf "frontend-dist-${GITHUB_REF_NAME}.tar.gz" -C frontend-dist
+
+      - name: Publish frontend assets to S3
+        run: |
+          aws s3 sync frontend-dist "s3://${{ vars.PROD_WEB_BUCKET }}" \
+            --delete \
+            --exclude "index.html" \
+            --cache-control "public,max-age=31536000,immutable"
+
+          aws s3 cp frontend-dist/index.html "s3://${{ vars.PROD_WEB_BUCKET }}/index.html" \
+            --cache-control "no-cache,no-store,must-revalidate"
+
+      - name: Narrow CloudFront invalidation
+        run: |
+          paths="${{ vars.PROD_CF_INVALIDATION_PATHS }}"
+          if [ -z "$paths" ]; then
+            paths="/index.html /"
+          fi
+
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.PROD_CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths $paths
+
+  smoke-checks:
+    runs-on: ubuntu-latest
+    environment: production
+    needs:
+      - deploy-backend
+      - deploy-frontend
+    steps:
+      - name: Backend health smoke check
+        run: |
+          curl -fsSL "${{ vars.PROD_API_HEALTH_URL }}"
+
+      - name: Frontend smoke check
+        run: |
+          curl -fsSL "${{ vars.PROD_WEB_URL }}" > /dev/null
+

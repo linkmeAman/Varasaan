@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import base64
 import importlib
+import shutil
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -43,9 +45,16 @@ class FakeMalwareClient:
 
 
 @pytest.fixture()
-async def test_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    db_path = tmp_path / "test.db"
-    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{db_path.as_posix()}")
+async def test_context(monkeypatch: pytest.MonkeyPatch):
+    tests_root = Path(__file__).resolve().parent
+    runtime_root = tests_root / ".tmp"
+    runtime_root.mkdir(parents=True, exist_ok=True)
+
+    runtime_dir = runtime_root / f"ctx-{uuid4().hex}"
+    runtime_dir.mkdir(parents=False, exist_ok=False)
+
+    db_url_path = Path("tests/.tmp") / runtime_dir.name / "test.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{db_url_path.as_posix()}")
     monkeypatch.setenv("DEBUG", "true")
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key")
     monkeypatch.setenv("CELERY_TASK_ALWAYS_EAGER", "true")
@@ -94,3 +103,7 @@ async def test_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
+
+    shutil.rmtree(runtime_dir, ignore_errors=True)
+
+

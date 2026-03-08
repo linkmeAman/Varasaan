@@ -6,6 +6,13 @@ __pycache__/
 .ruff_cache/
 .coverage
 coverage.xml
+backend/.venv/
+backend/.python-version
+backend/.alembic_test.db
+backend/src/varasaan_api.egg-info/
+backend/.tmp/
+backend/tmp_pytest/
+backend/tests/.tmp/
 
 # Local databases and env files
 *.db
@@ -15,3 +22,9 @@ coverage.xml
 # OS/editor
 .DS_Store
 Thumbs.db
+.vscode/
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
