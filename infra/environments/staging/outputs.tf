@@ -12,7 +12,8 @@ output "github_environment_vars" {
     STAGING_WEB_BUCKET                   = module.platform.web_bucket_name
     STAGING_CLOUDFRONT_DISTRIBUTION_ID   = module.platform.cloudfront_distribution_id
     STAGING_API_HEALTH_URL               = "http://${module.platform.alb_dns_name}/healthz"
-    STAGING_WEB_URL                      = "https://${module.platform.cloudfront_distribution_domain_name}"
+    STAGING_WEB_URL                      = ""
+    STAGING_LEGACY_WEB_URL               = "https://${module.platform.cloudfront_distribution_domain_name}"
   }
 }
 

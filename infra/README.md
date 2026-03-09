@@ -10,7 +10,7 @@ Both stacks call `infra/modules/platform`, which provisions:
 - ECR repository for API images
 - ECS cluster/service/task definition for API runtime
 - ALB + target group + listener
-- S3 bucket + CloudFront distribution for frontend hosting
+- S3 bucket + CloudFront distribution for legacy frontend fallback hosting
 - GitHub Actions OIDC IAM role for CI/CD deploy workflows
 - SSM parameter namespace for runtime variables
 
@@ -22,6 +22,14 @@ Promote Terraform outputs into GitHub Environment variables/secrets:
 2. `terraform -chdir=infra/environments/production output`
 3. Copy `github_environment_vars` keys into GitHub Environment variables.
 4. Copy `github_environment_secrets` keys into GitHub Environment secrets.
+
+## Frontend deployment note
+
+Frontend runtime has moved to **Vercel SSR**. Keep Terraform web resources for rollback/fallback, but frontend deploy jobs now require these GitHub settings:
+
+- Secret: `VERCEL_TOKEN`
+- Variables: `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`
+- Variables used for smoke checks (recommended custom domains): `STAGING_WEB_URL`, `PROD_WEB_URL`
 
 ## Validation
 

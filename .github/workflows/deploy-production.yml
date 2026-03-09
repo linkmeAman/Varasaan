@@ -24,14 +24,13 @@ jobs:
       release_commit_sha: ${{ steps.manifest.outputs.release_commit_sha }}
       release_tag: ${{ steps.manifest.outputs.release_tag }}
     steps:
-      - name: Download release manifest and frontend artifact
+      - name: Download release manifest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release download "${GITHUB_REF_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \
-            --pattern "release-manifest.json" \
-            --pattern "frontend-dist-${GITHUB_REF_NAME}.tar.gz"
+            --pattern "release-manifest.json"
 
       - name: Parse and validate manifest
         id: manifest
@@ -51,12 +50,6 @@ jobs:
 
           echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
           echo "release_commit_sha=$release_sha" >> "$GITHUB_OUTPUT"
-
-      - name: Upload frontend artifact for deploy job
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist-${{ github.ref_name }}
-          path: frontend-dist-${{ github.ref_name }}.tar.gz
 
   build-backend-image:
     runs-on: ubuntu-latest
@@ -188,41 +181,35 @@ jobs:
     needs:
       - fetch-release-manifest
       - deploy-backend
+    outputs:
+      production_url: ${{ steps.deploy.outputs.production_url }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          name: frontend-dist-${{ github.ref_name }}
+          ref: ${{ needs.fetch-release-manifest.outputs.release_commit_sha }}
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: actions/setup-node@v4
         with:
-          role-to-assume: ${{ secrets.AWS_PRODUCTION_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          node-version: 20.19.0
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Extract frontend artifact
+      - name: Build and deploy frontend to Vercel (production)
+        id: deploy
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
         run: |
-          mkdir -p frontend-dist
-          tar -xzf "frontend-dist-${GITHUB_REF_NAME}.tar.gz" -C frontend-dist
-
-      - name: Publish frontend assets to S3
-        run: |
-          aws s3 sync frontend-dist "s3://${{ vars.PROD_WEB_BUCKET }}" \
-            --delete \
-            --exclude "index.html" \
-            --cache-control "public,max-age=31536000,immutable"
-
-          aws s3 cp frontend-dist/index.html "s3://${{ vars.PROD_WEB_BUCKET }}/index.html" \
-            --cache-control "no-cache,no-store,must-revalidate"
-
-      - name: Narrow CloudFront invalidation
-        run: |
-          paths="${{ vars.PROD_CF_INVALIDATION_PATHS }}"
-          if [ -z "$paths" ]; then
-            paths="/index.html /"
+          npm ci
+          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest build --token="$VERCEL_TOKEN"
+          production_url=$(npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          if [[ "$production_url" != http* ]]; then
+            production_url="https://$production_url"
           fi
-
-          aws cloudfront create-invalidation \
-            --distribution-id "${{ vars.PROD_CLOUDFRONT_DISTRIBUTION_ID }}" \
-            --paths $paths
+          echo "production_url=$production_url" >> "$GITHUB_OUTPUT"
 
   smoke-checks:
     runs-on: ubuntu-latest
@@ -235,7 +222,21 @@ jobs:
         run: |
           curl -fsSL "${{ vars.PROD_API_HEALTH_URL }}"
 
+      - name: Resolve frontend URL
+        id: frontend_url
+        run: |
+          target_url="${{ vars.PROD_WEB_URL }}"
+          if [ -z "$target_url" ]; then
+            target_url="${{ needs.deploy-frontend.outputs.production_url }}"
+          fi
+
+          if [ -z "$target_url" ]; then
+            echo "No production frontend URL available. Set PROD_WEB_URL or ensure Vercel deploy outputs a URL."
+            exit 1
+          fi
+
+          echo "target_url=$target_url" >> "$GITHUB_OUTPUT"
+
       - name: Frontend smoke check
         run: |
-          curl -fsSL "${{ vars.PROD_WEB_URL }}" > /dev/null
-
+          curl -fsSL "${{ steps.frontend_url.outputs.target_url }}" > /dev/null

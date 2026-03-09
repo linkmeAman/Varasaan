@@ -16,7 +16,7 @@ Task Queue       → Celery + Redis broker (heartbeat jobs, PDF generation)
 File Storage     → AWS S3 / GCP GCS with client-side encryption (AES-256)
 Auth             → Passkey-first (WebAuthn) + TOTP fallback (pyotp)
                    JWT tokens: python-jose (RS256, not HS256)
-Frontend         → React + TypeScript
+Frontend         → Next.js (App Router) + React + TypeScript
 Mobile           → React Native (Phase 3+)
 Infra            → Docker + Kubernetes (GCP/AWS India region)
 Email            → AWS SES / Postmark (transactional only)

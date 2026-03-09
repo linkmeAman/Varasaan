@@ -12,7 +12,8 @@ output "github_environment_vars" {
     PROD_WEB_BUCKET                   = module.platform.web_bucket_name
     PROD_CLOUDFRONT_DISTRIBUTION_ID   = module.platform.cloudfront_distribution_id
     PROD_API_HEALTH_URL               = "http://${module.platform.alb_dns_name}/healthz"
-    PROD_WEB_URL                      = "https://${module.platform.cloudfront_distribution_domain_name}"
+    PROD_WEB_URL                      = ""
+    PROD_LEGACY_WEB_URL               = "https://${module.platform.cloudfront_distribution_domain_name}"
   }
 }
 

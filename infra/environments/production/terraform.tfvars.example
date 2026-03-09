@@ -12,5 +12,6 @@ api_task_environment = {
 }
 
 runtime_parameters = {
-  DATABASE_URL = "postgresql://..."
+  DATABASE_URL        = "postgresql://..."
+  CORS_ALLOW_ORIGINS = "http://localhost:3000,https://varasaan-staging.vercel.app,https://varasaan.vercel.app"
 }

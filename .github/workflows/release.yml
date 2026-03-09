@@ -44,13 +44,6 @@ jobs:
           tag=$(git tag --points-at HEAD "v*" | sort -V | tail -n 1)
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      - name: Build frontend release artifact
-        if: steps.release_tag.outputs.tag != ''
-        run: |
-          npm ci --prefix frontend
-          npm --prefix frontend run build
-          tar -czf "frontend-dist-${{ steps.release_tag.outputs.tag }}.tar.gz" -C frontend/dist .
-
       - name: Create release manifest
         if: steps.release_tag.outputs.tag != ''
         run: |
@@ -60,7 +53,7 @@ jobs:
             "release_commit_sha": "$(git rev-parse HEAD)",
             "backend_image_tag": "${{ steps.release_tag.outputs.tag }}",
             "backend_image_sha_tag": "${{ github.event.workflow_run.head_sha }}",
-            "frontend_asset": "frontend-dist-${{ steps.release_tag.outputs.tag }}.tar.gz"
+            "frontend_deploy_provider": "vercel"
           }
           EOF
 
@@ -71,17 +64,15 @@ jobs:
           name: release-manifest-${{ steps.release_tag.outputs.tag }}
           path: release-manifest.json
 
-      - name: Upload immutable release assets to GitHub release
+      - name: Upload release manifest to GitHub release
         if: steps.release_tag.outputs.tag != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ steps.release_tag.outputs.tag }}" \
-            "frontend-dist-${{ steps.release_tag.outputs.tag }}.tar.gz" \
             release-manifest.json \
             --clobber
 
       - name: No release generated
         if: steps.release_tag.outputs.tag == ''
         run: echo "No new semantic release was published for this commit range."
-

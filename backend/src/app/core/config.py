@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = Field(default="dev-change-me-super-secret-key")
 
     csp_connect_src: str = "'self' http://localhost:8000"
-    cors_allow_origins: str = "http://localhost:5173"
+    cors_allow_origins: str = "http://localhost:3000,http://localhost:5173,https://varasaan-staging.vercel.app,https://varasaan.vercel.app"
 
     razorpay_webhook_secret: str = "dev-razorpay-secret"
 

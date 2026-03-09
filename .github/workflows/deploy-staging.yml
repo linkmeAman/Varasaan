@@ -145,6 +145,8 @@ jobs:
   deploy-frontend:
     runs-on: ubuntu-latest
     needs: deploy-backend
+    outputs:
+      preview_url: ${{ steps.deploy.outputs.preview_url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -156,36 +158,22 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Build frontend
+      - name: Build and deploy frontend to Vercel (preview)
+        id: deploy
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
         run: |
-          npm ci --prefix frontend
-          npm --prefix frontend run build
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_STAGING_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Publish frontend assets to S3
-        run: |
-          aws s3 sync frontend/dist "s3://${{ vars.STAGING_WEB_BUCKET }}" \
-            --delete \
-            --exclude "index.html" \
-            --cache-control "public,max-age=31536000,immutable"
-
-          aws s3 cp frontend/dist/index.html "s3://${{ vars.STAGING_WEB_BUCKET }}/index.html" \
-            --cache-control "no-cache,no-store,must-revalidate"
-
-      - name: Narrow CloudFront invalidation
-        run: |
-          paths="${{ vars.STAGING_CF_INVALIDATION_PATHS }}"
-          if [ -z "$paths" ]; then
-            paths="/index.html /"
+          npm ci
+          npx --yes vercel@latest pull --yes --environment=preview --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest build --token="$VERCEL_TOKEN"
+          preview_url=$(npx --yes vercel@latest deploy --prebuilt --token="$VERCEL_TOKEN")
+          if [[ "$preview_url" != http* ]]; then
+            preview_url="https://$preview_url"
           fi
-
-          aws cloudfront create-invalidation \
-            --distribution-id "${{ vars.STAGING_CLOUDFRONT_DISTRIBUTION_ID }}" \
-            --paths $paths
+          echo "preview_url=$preview_url" >> "$GITHUB_OUTPUT"
 
   smoke-checks:
     runs-on: ubuntu-latest
@@ -197,7 +185,36 @@ jobs:
         run: |
           curl -fsSL "${{ vars.STAGING_API_HEALTH_URL }}"
 
+      - name: Resolve frontend URL
+        id: frontend_url
+        run: |
+          target_url="${{ vars.STAGING_WEB_URL }}"
+          if [ -z "$target_url" ]; then
+            target_url="${{ needs.deploy-frontend.outputs.preview_url }}"
+          fi
+
+          if [ -z "$target_url" ]; then
+            echo "No staging frontend URL available. Set STAGING_WEB_URL or ensure Vercel deploy outputs a URL."
+            exit 1
+          fi
+
+          echo "target_url=$target_url" >> "$GITHUB_OUTPUT"
+
       - name: Frontend smoke check
         run: |
-          curl -fsSL "${{ vars.STAGING_WEB_URL }}" > /dev/null
+          curl -fsSL "${{ steps.frontend_url.outputs.target_url }}" > /dev/null
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+
+      - name: Lighthouse performance gate (>= 90)
+        run: |
+          npm install --no-save lighthouse
+          npx lighthouse "${{ steps.frontend_url.outputs.target_url }}" \
+            --only-categories=performance \
+            --output=json \
+            --output-path=./lighthouse-report.json \
+            --chrome-flags="--headless --no-sandbox"
+
+          node -e "const fs=require('fs'); const report=JSON.parse(fs.readFileSync('./lighthouse-report.json','utf8')); const score=Math.round(report.categories.performance.score*100); console.log('Lighthouse performance score:', score); if (score < 90) process.exit(1);"
