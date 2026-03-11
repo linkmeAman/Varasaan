@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import Inventory from '../../../views/Inventory';
 
-export default function DashboardInventoryRedirectPage() {
-  redirect('/dashboard');
+export default function DashboardInventoryPage() {
+  return <Inventory />;
 }

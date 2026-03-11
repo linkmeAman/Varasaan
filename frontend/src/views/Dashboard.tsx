@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Plus, ListTodo, ShieldAlert, FolderOpen } from 'lucide-react';
 
 export default function Dashboard() {
@@ -8,9 +9,9 @@ export default function Dashboard() {
           <h1 className="dash-title">Digital Inventory</h1>
           <p className="dash-subtitle">Planning Mode • securely encrypting your footprint</p>
         </div>
-        <button className="dash-cta">
+        <Link href="/dashboard/inventory" className="dash-cta">
           <Plus size={18} /> Add Account
-        </button>
+        </Link>
       </header>
 
       <div className="dash-stats">
