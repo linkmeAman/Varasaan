@@ -7,7 +7,10 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError:  # pragma: no cover - exercised in CI environments without PyYAML
+    yaml = None
 
 
 HTTP_METHODS = ("get", "post", "put", "patch", "delete", "options", "head")
@@ -244,14 +247,9 @@ def normalize_parameters(
     return list(merged.values())
 
 
-def render() -> str:
-    repo_root = Path(__file__).resolve().parents[2]
-    spec_path = repo_root / "packages" / "shared" / "openapi" / "openapi.yaml"
-    with spec_path.open("r", encoding="utf-8") as handle:
-        spec = yaml.safe_load(handle)
-
+def render(spec: dict[str, Any], source_label: str) -> str:
     if not isinstance(spec, dict):
-        raise ValueError(f"Invalid OpenAPI file at {spec_path}")
+        raise ValueError(f"Invalid OpenAPI document loaded from {source_label}")
 
     components = spec.get("components") or {}
     schemas = components.get("schemas") or {}
@@ -406,15 +404,29 @@ def render() -> str:
 
 def main() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    spec_path = repo_root / "packages" / "shared" / "openapi" / "openapi.yaml"
-    spec = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+    yaml_path = repo_root / "packages" / "shared" / "openapi" / "openapi.yaml"
+    json_path = repo_root / "packages" / "shared" / "openapi" / "openapi.generated.json"
+
+    spec: dict[str, Any]
+    source_label: str
+
+    if yaml is not None and yaml_path.exists():
+        spec = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+        source_label = "packages/shared/openapi/openapi.yaml"
+    elif json_path.exists():
+        spec = json.loads(json_path.read_text(encoding="utf-8"))
+        source_label = "packages/shared/openapi/openapi.generated.json"
+    else:
+        raise FileNotFoundError(
+            "Neither OpenAPI YAML nor generated JSON artifact was available for API client generation."
+        )
 
     json_output_path = repo_root / "packages" / "shared" / "openapi" / "openapi.generated.json"
     json_output_path.write_text(json.dumps(spec, indent=2), encoding="utf-8")
 
     output_path = repo_root / "frontend" / "src" / "lib" / "generated" / "api-client.ts"
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(render(), encoding="utf-8")
+    output_path.write_text(render(spec, source_label), encoding="utf-8")
 
     print(f"Generated {json_output_path}")
     print(f"Generated {output_path}")

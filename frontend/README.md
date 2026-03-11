@@ -1,6 +1,6 @@
 # Frontend (Next.js)
 
-This app is now built with **Next.js App Router** + TypeScript.
+This app is built with **Next.js App Router** + TypeScript.
 
 ## Scripts
 
@@ -16,11 +16,24 @@ This app is now built with **Next.js App Router** + TypeScript.
 
 - `NEXT_PUBLIC_API_BASE_URL` - backend base URL used by the frontend API client.
 
-## Route Compatibility
+## Auth UX
 
-The Next.js app includes redirect compatibility for legacy links:
+Implemented routes:
 
-- `/register` -> `/login`
-- `/recovery` -> `/login`
-- `/dashboard/inventory` -> `/dashboard`
+- `/login` - real login + session handling
+- `/register` - signup + policy-consent fetch + email verification token flow
+- `/recovery` - password reset + account recovery assist/confirm flows
+
+Protected workspaces:
+
+- `/dashboard`
+- `/dashboard/inventory`
+- `/dashboard/trusted-contacts`
+- `/dashboard/documents`
+- `/dashboard/packets`
+- `/dashboard/exports`
+- `/dashboard/billing`
+
+Compatibility redirects:
+
 - unknown routes -> `/`

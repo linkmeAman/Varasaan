@@ -77,6 +77,101 @@ async def test_auth_session_rotation_and_revocation(test_context):
 
 
 @pytest.mark.asyncio
+async def test_auth_signup_and_password_reset_debug_tokens(test_context):
+    client = test_context["client"]
+    session_factory = test_context["session_factory"]
+
+    async with session_factory() as db:
+        await seed_active_policies(db)
+
+    signup_response = await client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "debugger@example.com",
+            "password": "StrongPassw0rd!!123",
+            "consents": [
+                {"policy_type": "privacy", "policy_version": "2026.03"},
+                {"policy_type": "terms", "policy_version": "2026.03"},
+            ],
+        },
+    )
+    assert signup_response.status_code == 201, signup_response.text
+    verification_token = signup_response.json().get("verification_token")
+    assert verification_token
+
+    verify_response = await client.post("/api/v1/auth/verify-email", json={"token": verification_token})
+    assert verify_response.status_code == 200, verify_response.text
+
+    login_response = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "debugger@example.com", "password": "StrongPassw0rd!!123"},
+    )
+    assert login_response.status_code == 200, login_response.text
+
+    reset_response = await client.post(
+        "/api/v1/auth/password-reset/request",
+        json={"email": "debugger@example.com"},
+    )
+    assert reset_response.status_code == 200, reset_response.text
+    reset_token = reset_response.json().get("reset_token")
+    assert reset_token
+
+    confirm_response = await client.post(
+        "/api/v1/auth/password-reset/confirm",
+        json={"token": reset_token, "new_password": "AnotherStrongPass!123"},
+    )
+    assert confirm_response.status_code == 200, confirm_response.text
+
+
+@pytest.mark.asyncio
+async def test_inventory_crud_flow(test_context):
+    client = test_context["client"]
+    user = await _signup_and_login(test_context, email="inventory@example.com", password="StrongPassw0rd!!123")
+
+    create_response = await client.post(
+        "/api/v1/inventory/accounts",
+        headers=_auth_header(user["access_token"]),
+        json={
+            "platform": "Gmail",
+            "category": "communication",
+            "username_hint": "inventory@example.com",
+            "importance_level": 3,
+        },
+    )
+    assert create_response.status_code == 201, create_response.text
+    created = create_response.json()
+
+    update_response = await client.put(
+        f"/api/v1/inventory/accounts/{created['id']}",
+        headers=_auth_header(user["access_token"]),
+        json={
+            "platform": "Google Workspace",
+            "category": "communication",
+            "username_hint": "workspace@example.com",
+            "importance_level": 5,
+        },
+    )
+    assert update_response.status_code == 200, update_response.text
+    assert update_response.json()["importance_level"] == 5
+
+    list_response = await client.get("/api/v1/inventory/accounts", headers=_auth_header(user["access_token"]))
+    assert list_response.status_code == 200, list_response.text
+    listed = list_response.json()
+    assert len(listed) == 1
+    assert listed[0]["platform"] == "Google Workspace"
+
+    delete_response = await client.delete(
+        f"/api/v1/inventory/accounts/{created['id']}",
+        headers=_auth_header(user["access_token"]),
+    )
+    assert delete_response.status_code == 200, delete_response.text
+
+    after_delete = await client.get("/api/v1/inventory/accounts", headers=_auth_header(user["access_token"]))
+    assert after_delete.status_code == 200, after_delete.text
+    assert after_delete.json() == []
+
+
+@pytest.mark.asyncio
 async def test_document_upload_scan_download_authorization(test_context):
     client = test_context["client"]
     owner = await _signup_and_login(test_context, email="owner@example.com", password="StrongPassw0rd!!123")
@@ -125,6 +220,50 @@ async def test_document_upload_scan_download_authorization(test_context):
 
 
 @pytest.mark.asyncio
+async def test_document_listing_and_version_status_endpoints(test_context):
+    client = test_context["client"]
+    owner = await _signup_and_login(test_context, email="docs-reader@example.com", password="StrongPassw0rd!!123")
+
+    init_upload = await client.post(
+        "/api/v1/documents/uploads/init",
+        headers=_auth_header(owner["access_token"]),
+        json={
+            "doc_type": "death_certificate",
+            "size_bytes": 1024,
+            "content_type": "application/pdf",
+            "sha256": "b" * 64,
+        },
+    )
+    assert init_upload.status_code == 201, init_upload.text
+    document_id = init_upload.json()["document_id"]
+    version_id = init_upload.json()["version_id"]
+
+    queue_scan = await client.post(
+        f"/api/v1/documents/versions/{version_id}/scan",
+        headers=_auth_header(owner["access_token"]),
+    )
+    assert queue_scan.status_code == 200, queue_scan.text
+
+    list_docs = await client.get("/api/v1/documents", headers=_auth_header(owner["access_token"]))
+    assert list_docs.status_code == 200, list_docs.text
+    documents = list_docs.json()
+    assert len(documents) == 1
+    assert documents[0]["id"] == document_id
+
+    get_doc = await client.get(f"/api/v1/documents/{document_id}", headers=_auth_header(owner["access_token"]))
+    assert get_doc.status_code == 200, get_doc.text
+    detail = get_doc.json()
+    assert detail["id"] == document_id
+    assert len(detail["versions"]) == 1
+
+    get_version = await client.get(f"/api/v1/documents/versions/{version_id}", headers=_auth_header(owner["access_token"]))
+    assert get_version.status_code == 200, get_version.text
+    version_body = get_version.json()
+    assert version_body["id"] == version_id
+    assert version_body["scan_status"] == "clean"
+
+
+@pytest.mark.asyncio
 async def test_export_one_time_token_behavior(test_context):
     client = test_context["client"]
     user = await _signup_and_login(test_context, email="exporter@example.com", password="StrongPassw0rd!!123")
@@ -146,6 +285,23 @@ async def test_export_one_time_token_behavior(test_context):
 
     replay_download = await client.get(f"/api/v1/exports/{export_job_id}/download-by-token", params={"token": one_time_token})
     assert replay_download.status_code == 410, replay_download.text
+
+
+@pytest.mark.asyncio
+async def test_payment_checkout_response_contains_provider_metadata(test_context):
+    client = test_context["client"]
+    user = await _signup_and_login(test_context, email="checkout@example.com", password="StrongPassw0rd!!123")
+
+    create_checkout = await client.post(
+        "/api/v1/payments/checkout",
+        headers=_auth_header(user["access_token"]),
+        json={"amount_paise": 49900, "currency": "INR"},
+    )
+    assert create_checkout.status_code == 201, create_checkout.text
+    body = create_checkout.json()
+    assert body["provider"] == "razorpay"
+    assert body["provider_order_id"] == body["order_id"]
+    assert "checkout_key_id" in body
 
 
 @pytest.mark.asyncio
@@ -224,3 +380,39 @@ async def test_payment_webhook_replay_and_out_of_order_handling(test_context):
     assert body["event_sequence"] == 1
 
 
+@pytest.mark.asyncio
+async def test_trusted_contact_invite_debug_token_acceptance(test_context):
+    client = test_context["client"]
+    owner = await _signup_and_login(test_context, email="owner-tc@example.com", password="StrongPassw0rd!!123")
+
+    created = await client.post(
+        "/api/v1/trusted-contacts",
+        headers=_auth_header(owner["access_token"]),
+        json={
+            "name": "Helper One",
+            "email": "helper@example.com",
+            "role": "recovery_assist",
+            "recovery_enabled": True,
+        },
+    )
+    assert created.status_code == 201, created.text
+    contact_id = created.json()["id"]
+
+    invite_response = await client.post(
+        f"/api/v1/trusted-contacts/{contact_id}/invite",
+        headers=_auth_header(owner["access_token"]),
+        json={"force_reissue": True},
+    )
+    assert invite_response.status_code == 200, invite_response.text
+    invite_token = invite_response.json().get("invite_token")
+    assert invite_token
+
+    accept_response = await client.post(
+        "/api/v1/trusted-contacts/invite/accept",
+        params={"token": invite_token},
+    )
+    assert accept_response.status_code == 200, accept_response.text
+
+    contacts = await client.get("/api/v1/trusted-contacts", headers=_auth_header(owner["access_token"]))
+    assert contacts.status_code == 200, contacts.text
+    assert contacts.json()[0]["status"] == "active"

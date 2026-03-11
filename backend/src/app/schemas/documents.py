@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -38,3 +40,31 @@ class GrantCreateRequest(BaseModel):
 class ScanDispatchResponse(BaseModel):
     version_id: str
     status: str
+
+
+class DocumentVersionStatusResponse(BaseModel):
+    id: str
+    document_id: str
+    version_no: int
+    state: str
+    object_key: str
+    size_bytes: int
+    sha256: str | None = None
+    created_at: datetime
+    scan_status: str | None = None
+    scan_summary: str | None = None
+    scan_failed_purge_at: datetime | None = None
+
+
+class DocumentSummaryResponse(BaseModel):
+    id: str
+    doc_type: str
+    state: str
+    current_version_id: str | None = None
+    created_at: datetime
+    deleted_at: datetime | None = None
+    current_version: DocumentVersionStatusResponse | None = None
+
+
+class DocumentDetailResponse(DocumentSummaryResponse):
+    versions: list[DocumentVersionStatusResponse]

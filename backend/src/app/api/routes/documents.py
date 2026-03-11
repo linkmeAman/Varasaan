@@ -5,10 +5,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import db_session_dep, get_current_user
 from app.core.config import get_settings
-from app.models import User
+from app.models import DocumentVersion, User
 from app.schemas.common import ApiMessage
 from app.schemas.documents import (
+    DocumentDetailResponse,
     DocumentDownloadResponse,
+    DocumentSummaryResponse,
+    DocumentVersionStatusResponse,
     GrantCreateRequest,
     ScanDispatchResponse,
     UploadInitRequest,
@@ -18,6 +21,22 @@ from app.services import documents as document_service
 from app.workers.tasks import enqueue_malware_scan
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+
+
+def _version_response(version: DocumentVersion, scan_status: str | None = None, scan_summary: str | None = None) -> DocumentVersionStatusResponse:
+    return DocumentVersionStatusResponse(
+        id=version.id,
+        document_id=version.document_id,
+        version_no=version.version_no,
+        state=version.state.value,
+        object_key=version.object_key,
+        size_bytes=version.size_bytes,
+        sha256=version.sha256,
+        created_at=version.created_at,
+        scan_status=scan_status,
+        scan_summary=scan_summary,
+        scan_failed_purge_at=version.scan_failed_purge_at,
+    )
 
 
 @router.post("/uploads/init", response_model=UploadInitResponse, status_code=status.HTTP_201_CREATED)
@@ -37,6 +56,88 @@ async def init_upload(
         upload_url_expires_in_seconds=settings.upload_url_ttl_minutes * 60,
         plaintext_dek_b64=result.plaintext_dek_b64,
         kms_key_id=result.kms_key_id,
+    )
+
+
+@router.get("", response_model=list[DocumentSummaryResponse])
+async def list_documents(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(db_session_dep),
+) -> list[DocumentSummaryResponse]:
+    documents = await document_service.list_documents_for_user(db, user.id)
+    response: list[DocumentSummaryResponse] = []
+    for document in documents:
+        current_version = None
+        if document.current_version_id:
+            version = await db.get(DocumentVersion, document.current_version_id)
+            if version:
+                scan = await document_service.get_scan_for_version(db, version.id)
+                current_version = _version_response(
+                    version,
+                    scan_status=scan.status.value if scan else None,
+                    scan_summary=scan.result_summary if scan else None,
+                )
+
+        response.append(
+            DocumentSummaryResponse(
+                id=document.id,
+                doc_type=document.doc_type,
+                state=document.state.value,
+                current_version_id=document.current_version_id,
+                created_at=document.created_at,
+                deleted_at=document.deleted_at,
+                current_version=current_version,
+            )
+        )
+    return response
+
+
+@router.get("/{document_id}", response_model=DocumentDetailResponse)
+async def get_document(
+    document_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(db_session_dep),
+) -> DocumentDetailResponse:
+    document = await document_service.get_document_for_user(db, user.id, document_id)
+    versions = await document_service.list_versions_for_document(db, document_id)
+
+    version_responses: list[DocumentVersionStatusResponse] = []
+    current_version_response: DocumentVersionStatusResponse | None = None
+    for version in versions:
+        scan = await document_service.get_scan_for_version(db, version.id)
+        serialized = _version_response(
+            version,
+            scan_status=scan.status.value if scan else None,
+            scan_summary=scan.result_summary if scan else None,
+        )
+        version_responses.append(serialized)
+        if version.id == document.current_version_id:
+            current_version_response = serialized
+
+    return DocumentDetailResponse(
+        id=document.id,
+        doc_type=document.doc_type,
+        state=document.state.value,
+        current_version_id=document.current_version_id,
+        created_at=document.created_at,
+        deleted_at=document.deleted_at,
+        current_version=current_version_response,
+        versions=version_responses,
+    )
+
+
+@router.get("/versions/{version_id}", response_model=DocumentVersionStatusResponse)
+async def get_document_version(
+    version_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(db_session_dep),
+) -> DocumentVersionStatusResponse:
+    version = await document_service.get_version_for_user(db, user.id, version_id)
+    scan = await document_service.get_scan_for_version(db, version_id)
+    return _version_response(
+        version,
+        scan_status=scan.status.value if scan else None,
+        scan_summary=scan.result_summary if scan else None,
     )
 
 

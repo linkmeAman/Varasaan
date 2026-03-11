@@ -66,6 +66,12 @@ class JurisdictionConfirmRequest(BaseModel):
 
 class SignupResponse(BaseModel):
     message: str
+    verification_token: str | None = None
+
+
+class PasswordResetRequestResponse(BaseModel):
+    message: str
+    reset_token: str | None = None
 
 
 class UserSessionResponse(BaseModel):

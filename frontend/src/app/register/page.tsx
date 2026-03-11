@@ -1,5 +1,11 @@
-import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default function RegisterRedirectPage() {
-  redirect('/login');
+import Register from '../../views/Register';
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <Register />
+    </Suspense>
+  );
 }

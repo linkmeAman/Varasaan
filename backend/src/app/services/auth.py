@@ -1,5 +1,8 @@
-from datetime import UTC, datetime, timedelta
+from __future__ import annotations
+
 import hashlib
+import logging
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, select
@@ -16,6 +19,7 @@ from app.core.security import (
     hash_token,
     verify_password,
 )
+from app.integrations.email import get_email_client
 from app.models import (
     AccountRecoveryRequest,
     Consent,
@@ -31,6 +35,8 @@ from app.schemas.auth import SignupRequest
 from app.services.audit import create_audit_log
 from app.services.legal import get_active_policy
 
+logger = logging.getLogger(__name__)
+
 
 def _hash_ip(ip: str | None) -> str | None:
     if not ip:
@@ -38,7 +44,7 @@ def _hash_ip(ip: str | None) -> str | None:
     return hashlib.sha256(ip.encode("utf-8")).hexdigest()
 
 
-async def create_user(db: AsyncSession, payload: SignupRequest, client_ip: str | None) -> User:
+async def create_user(db: AsyncSession, payload: SignupRequest, client_ip: str | None) -> tuple[User, str]:
     existing = await db.execute(select(User).where(User.email == payload.email.lower()))
     if existing.scalars().first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
@@ -87,7 +93,13 @@ async def create_user(db: AsyncSession, payload: SignupRequest, client_ip: str |
         ip_hash=_hash_ip(client_ip),
         metadata={"email": user.email, "email_verification_token": "redacted"},
     )
-    return user
+
+    try:
+        await get_email_client().send_verification_email(to_email=user.email, token=verification_token)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("verification email dispatch failed for %s: %s", user.email, exc)
+
+    return user, verification_token
 
 
 async def verify_email(db: AsyncSession, token: str) -> None:
@@ -177,16 +189,23 @@ async def revoke_all_sessions(db: AsyncSession, user_id: str) -> None:
         session.revoked_at = now
 
 
-async def password_reset_request(db: AsyncSession, email: str) -> None:
+async def password_reset_request(db: AsyncSession, email: str) -> str | None:
     result = await db.execute(select(User).where(User.email == email.lower()))
     user = result.scalars().first()
     if not user:
-        return
+        return None
 
     settings = get_settings()
     token = generate_token_secret()
     user.password_reset_token_hash = hash_token(token)
     user.password_reset_expires_at = datetime.now(UTC) + timedelta(minutes=settings.password_reset_token_ttl_minutes)
+
+    try:
+        await get_email_client().send_password_reset_email(to_email=user.email, token=token)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("password reset email dispatch failed for %s: %s", user.email, exc)
+
+    return token
 
 
 async def password_reset_confirm(db: AsyncSession, token: str, new_password: str) -> None:
@@ -293,7 +312,11 @@ async def request_account_recovery(
     request = AccountRecoveryRequest(
         user_id=user.id,
         mode=recovery_mode,
-        status=(RecoveryRequestStatus.APPROVAL_PENDING if recovery_mode == RecoveryMode.TRUSTED_CONTACT else RecoveryRequestStatus.PENDING),
+        status=(
+            RecoveryRequestStatus.APPROVAL_PENDING
+            if recovery_mode == RecoveryMode.TRUSTED_CONTACT
+            else RecoveryRequestStatus.PENDING
+        ),
         trusted_contact_id=trusted_contact.id if trusted_contact else None,
         recovery_token_hash=hash_token(recovery_token),
         approval_token_hash=hash_token(approval_token) if approval_token else None,
@@ -301,6 +324,21 @@ async def request_account_recovery(
     )
     db.add(request)
     await db.flush()
+
+    try:
+        await get_email_client().send_recovery_email(
+            to_email=user.email,
+            token=recovery_token,
+            mode=recovery_mode.value,
+        )
+        if recovery_mode == RecoveryMode.TRUSTED_CONTACT and approval_token and trusted_contact:
+            await get_email_client().send_recovery_approval_email(
+                to_email=trusted_contact.email,
+                token=approval_token,
+            )
+    except Exception as exc:  # pragma: no cover
+        logger.warning("account recovery email dispatch failed for %s: %s", user.email, exc)
+
     return request, recovery_token, approval_token
 
 

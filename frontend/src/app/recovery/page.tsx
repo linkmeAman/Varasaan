@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import Recovery from '../../views/Recovery';
 
-export default function RecoveryRedirectPage() {
-  redirect('/login');
+export default function RecoveryPage() {
+  return <Recovery />;
 }

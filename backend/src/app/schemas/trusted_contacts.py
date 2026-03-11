@@ -14,6 +14,11 @@ class TrustedContactInviteRequest(BaseModel):
     force_reissue: bool = False
 
 
+class TrustedContactInviteResponse(BaseModel):
+    message: str
+    invite_token: str | None = None
+
+
 class TrustedContactResponse(BaseModel):
     id: str
     name: str

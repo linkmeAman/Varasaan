@@ -60,6 +60,9 @@ async def test_context(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("CELERY_TASK_ALWAYS_EAGER", "true")
     monkeypatch.setenv("RAZORPAY_WEBHOOK_SECRET", "whsec_test")
     monkeypatch.setenv("OPENAPI_CONTRACT_PATH", "packages/shared/openapi/openapi.yaml")
+    monkeypatch.setenv("SIGNUP_RATE_LIMIT_PER_HOUR", "200")
+    monkeypatch.setenv("LOGIN_RATE_LIMIT_PER_MINUTE", "200")
+    monkeypatch.setenv("RESET_RATE_LIMIT_PER_HOUR", "200")
 
     from app.core.config import get_settings
     from app.db.session import get_engine, get_session_factory
@@ -105,5 +108,6 @@ async def test_context(monkeypatch: pytest.MonkeyPatch):
     await engine.dispose()
 
     shutil.rmtree(runtime_dir, ignore_errors=True)
+
 
 

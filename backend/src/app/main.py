@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import yaml
@@ -15,6 +16,14 @@ from app.core.logging import configure_logging
 
 configure_logging()
 settings = get_settings()
+
+if settings.sentry_dsn:
+    try:  # pragma: no cover
+        import sentry_sdk
+
+        sentry_sdk.init(dsn=settings.sentry_dsn, environment=settings.env)
+    except Exception as exc:  # pragma: no cover
+        logging.getLogger(__name__).warning("Sentry initialization skipped: %s", exc)
 
 app = FastAPI(
     title=settings.app_name,

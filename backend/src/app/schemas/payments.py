@@ -8,6 +8,9 @@ class PaymentCheckoutRequest(BaseModel):
 
 class PaymentCheckoutResponse(BaseModel):
     order_id: str
+    provider: str
+    provider_order_id: str
+    checkout_key_id: str | None = None
     amount_paise: int
     currency: str
     status: str

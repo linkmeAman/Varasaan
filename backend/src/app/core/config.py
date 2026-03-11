@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     cors_allow_origins: str = "http://localhost:3000,http://localhost:5173,https://varasaan-staging.vercel.app,https://varasaan.vercel.app"
 
     razorpay_webhook_secret: str = "dev-razorpay-secret"
+    razorpay_key_id: str | None = None
+
+    email_provider: Literal["log", "postmark"] = "log"
+    email_from_address: str = "no-reply@varasaan.local"
+    postmark_server_token: str | None = None
+    frontend_base_url: str = "http://localhost:3000"
+
+    sentry_dsn: str | None = None
 
     aws_region: str = "ap-south-1"
     s3_bucket_documents: str = "varasaan-documents"
@@ -97,4 +105,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

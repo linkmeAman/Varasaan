@@ -9,7 +9,7 @@ export type ErrorDetail = { code: string; message: string; details?: Record<stri
 export type ErrorResponse = { error: ErrorDetail; };
 export type ConsentInput = { policy_type: "privacy" | "terms"; policy_version: string; };
 export type SignupRequest = { email: string; password: string; full_name?: string | null; phone?: string | null; jurisdiction_code?: string; consents: ConsentInput[]; };
-export type SignupResponse = { message: string; };
+export type SignupResponse = { message: string; verification_token?: string | null; };
 export type LoginRequest = { email: string; password: string; };
 export type RefreshRequest = { refresh_token: string; };
 export type LogoutRequest = { refresh_token: string; };
@@ -35,7 +35,7 @@ export type ExportDownloadResponse = { download_url: string; expires_in_seconds:
 export type PacketGenerateRequest = { platform: string; };
 export type PacketJobResponse = { id: string; status: "queued" | "running" | "ready" | "failed"; platform: string; };
 export type PaymentCheckoutRequest = { amount_paise: number; currency?: string; };
-export type PaymentCheckoutResponse = { order_id: string; amount_paise: number; currency: string; status: "created" | "authorized" | "captured" | "failed" | "refunded"; };
+export type PaymentCheckoutResponse = { order_id: string; provider: string; provider_order_id: string; checkout_key_id?: string | null; amount_paise: number; currency: string; status: "created" | "authorized" | "captured" | "failed" | "refunded"; };
 export type PaymentWebhookRequest = { event_id?: string | null; order_id: string; payment_id?: string | null; status: string; event_sequence: number; };
 export type PaymentWebhookResponse = { accepted: boolean; processed: boolean; reason: string; status?: string | null; };
 export type PaymentStatusResponse = { order_id: string; payment_id?: string | null; status: "created" | "authorized" | "captured" | "failed" | "refunded"; event_sequence: number; };
@@ -46,6 +46,12 @@ export type TrustedContactInviteRequest = { force_reissue?: boolean; };
 export type TrustedContactResponse = { id: string; name: string; email: string; role: "viewer" | "packet_access" | "recovery_assist"; status: "pending" | "active" | "revoked"; };
 export type InventoryCreateRequest = { platform: string; category: string; username_hint?: string | null; importance_level?: number; };
 export type InventoryResponse = { id: string; platform: string; category: string; username_hint?: string | null; importance_level: number; };
+export type PasswordResetRequestResponse = { message: string; reset_token?: string | null; };
+export type TrustedContactInviteResponse = { message: string; invite_token?: string | null; };
+export type InventoryUpdateRequest = { platform: string; category: string; username_hint?: string | null; importance_level: number; };
+export type DocumentVersionStatusResponse = { id: string; document_id: string; version_no: number; state: string; object_key: string; size_bytes: number; sha256?: string | null; created_at: string; scan_status?: string | null; scan_summary?: string | null; scan_failed_purge_at?: string | null; };
+export type DocumentSummaryResponse = { id: string; doc_type: string; state: string; current_version_id?: string | null; created_at: string; deleted_at?: string | null; current_version?: DocumentVersionStatusResponse; };
+export type DocumentDetailResponse = DocumentSummaryResponse & { versions: DocumentVersionStatusResponse[]; };
 
 export interface ConfirmJurisdictionArgs {
   body: JurisdictionConfirmRequest;
@@ -95,11 +101,19 @@ export interface InitDocumentUploadArgs {
   body: UploadInitRequest;
 }
 
+export interface GetDocumentVersionArgs {
+  versionId: string;
+}
+
 export interface QueueDocumentScanArgs {
   versionId: string;
 }
 
 export interface SoftDeleteDocumentArgs {
+  documentId: string;
+}
+
+export interface GetDocumentArgs {
   documentId: string;
 }
 
@@ -137,6 +151,15 @@ export interface IssueExportTokenArgs {
 
 export interface CreateInventoryAccountArgs {
   body: InventoryCreateRequest;
+}
+
+export interface DeleteInventoryAccountArgs {
+  accountId: string;
+}
+
+export interface UpdateInventoryAccountArgs {
+  accountId: string;
+  body: InventoryUpdateRequest;
 }
 
 export interface CreatePolicyArgs {
@@ -241,8 +264,8 @@ export class VarasaanApiClient {
     });
   }
 
-  public async passwordResetRequest(args: PasswordResetRequestArgs, config: AxiosRequestConfig = {}): Promise<ApiMessage> {
-    return this.request<ApiMessage>({
+  public async passwordResetRequest(args: PasswordResetRequestArgs, config: AxiosRequestConfig = {}): Promise<PasswordResetRequestResponse> {
+    return this.request<PasswordResetRequestResponse>({
       ...config,
       method: "POST",
       url: `/api/v1/auth/password-reset/request`,
@@ -304,12 +327,28 @@ export class VarasaanApiClient {
     });
   }
 
+  public async listDocuments(config: AxiosRequestConfig = {}): Promise<DocumentSummaryResponse[]> {
+    return this.request<DocumentSummaryResponse[]>({
+      ...config,
+      method: "GET",
+      url: `/api/v1/documents`,
+    });
+  }
+
   public async initDocumentUpload(args: InitDocumentUploadArgs, config: AxiosRequestConfig = {}): Promise<UploadInitResponse> {
     return this.request<UploadInitResponse>({
       ...config,
       method: "POST",
       url: `/api/v1/documents/uploads/init`,
       data: args.body,
+    });
+  }
+
+  public async getDocumentVersion(args: GetDocumentVersionArgs, config: AxiosRequestConfig = {}): Promise<DocumentVersionStatusResponse> {
+    return this.request<DocumentVersionStatusResponse>({
+      ...config,
+      method: "GET",
+      url: `/api/v1/documents/versions/${encodeURIComponent(String(args.versionId))}`,
     });
   }
 
@@ -325,6 +364,14 @@ export class VarasaanApiClient {
     return this.request<ApiMessage>({
       ...config,
       method: "DELETE",
+      url: `/api/v1/documents/${encodeURIComponent(String(args.documentId))}`,
+    });
+  }
+
+  public async getDocument(args: GetDocumentArgs, config: AxiosRequestConfig = {}): Promise<DocumentDetailResponse> {
+    return this.request<DocumentDetailResponse>({
+      ...config,
+      method: "GET",
       url: `/api/v1/documents/${encodeURIComponent(String(args.documentId))}`,
     });
   }
@@ -410,6 +457,23 @@ export class VarasaanApiClient {
       ...config,
       method: "POST",
       url: `/api/v1/inventory/accounts`,
+      data: args.body,
+    });
+  }
+
+  public async deleteInventoryAccount(args: DeleteInventoryAccountArgs, config: AxiosRequestConfig = {}): Promise<ApiMessage> {
+    return this.request<ApiMessage>({
+      ...config,
+      method: "DELETE",
+      url: `/api/v1/inventory/accounts/${encodeURIComponent(String(args.accountId))}`,
+    });
+  }
+
+  public async updateInventoryAccount(args: UpdateInventoryAccountArgs, config: AxiosRequestConfig = {}): Promise<InventoryResponse> {
+    return this.request<InventoryResponse>({
+      ...config,
+      method: "PUT",
+      url: `/api/v1/inventory/accounts/${encodeURIComponent(String(args.accountId))}`,
       data: args.body,
     });
   }
@@ -509,8 +573,8 @@ export class VarasaanApiClient {
     });
   }
 
-  public async inviteTrustedContact(args: InviteTrustedContactArgs, config: AxiosRequestConfig = {}): Promise<ApiMessage> {
-    return this.request<ApiMessage>({
+  public async inviteTrustedContact(args: InviteTrustedContactArgs, config: AxiosRequestConfig = {}): Promise<TrustedContactInviteResponse> {
+    return this.request<TrustedContactInviteResponse>({
       ...config,
       method: "POST",
       url: `/api/v1/trusted-contacts/${encodeURIComponent(String(args.trustedContactId))}/invite`,

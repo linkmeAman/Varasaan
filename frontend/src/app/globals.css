@@ -1154,3 +1154,33 @@ button {
   font-size: 0.95rem;
   margin-top: 1rem;
 }
+
+.inventory-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.inventory-item-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.inventory-panel .section-title {
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 900px) {
+  .inventory-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .inventory-item-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

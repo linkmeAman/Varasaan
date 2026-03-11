@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+import logging
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, func, select
@@ -7,8 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.datetime_utils import as_utc
 from app.core.security import generate_token_secret, hash_token
-from app.models import InviteToken, TrustedContact, TrustedContactStatus
+from app.integrations.email import get_email_client
+from app.models import InviteToken, TrustedContact, TrustedContactStatus, User
 from app.schemas.trusted_contacts import TrustedContactCreateRequest
+
+logger = logging.getLogger(__name__)
 
 
 def _generic_invite_message() -> str:
@@ -68,6 +72,18 @@ async def send_invite(db: AsyncSession, user_id: str, trusted_contact_id: str, f
         existing.revoked_at = now
     db.add(token_record)
     await db.flush()
+
+    inviter = await db.get(User, user_id)
+    inviter_email = inviter.email if inviter else "a Varasaan user"
+    try:
+        await get_email_client().send_trusted_contact_invite(
+            to_email=contact.email,
+            token=token,
+            inviter_email=inviter_email,
+        )
+    except Exception as exc:  # pragma: no cover
+        logger.warning("trusted contact invite email dispatch failed for %s: %s", contact.email, exc)
+
     return _generic_invite_message(), token
 
 

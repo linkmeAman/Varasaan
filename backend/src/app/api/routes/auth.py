@@ -15,6 +15,7 @@ from app.schemas.auth import (
     LogoutRequest,
     PasswordResetConfirmRequest,
     PasswordResetRequest,
+    PasswordResetRequestResponse,
     RecoveryAssistRequest,
     RecoveryAssistResponse,
     RecoveryConfirmRequest,
@@ -43,8 +44,11 @@ async def signup(payload: SignupRequest, request: Request, db: AsyncSession = De
     if not allowed:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Signup rate limit exceeded")
 
-    await auth_service.create_user(db, payload, request.client.host if request.client else None)
-    return SignupResponse(message="Signup successful. Verify your email to continue.")
+    _user, verification_token = await auth_service.create_user(db, payload, request.client.host if request.client else None)
+    return SignupResponse(
+        message="Signup successful. Verify your email to continue.",
+        verification_token=verification_token if settings.debug else None,
+    )
 
 
 @router.post("/verify-email", response_model=ApiMessage)
@@ -102,12 +106,12 @@ async def logout_all(user: User = Depends(get_current_user), db: AsyncSession = 
     return ApiMessage(message="All sessions revoked")
 
 
-@router.post("/password-reset/request", response_model=ApiMessage)
+@router.post("/password-reset/request", response_model=PasswordResetRequestResponse)
 async def password_reset_request(
     payload: PasswordResetRequest,
     request: Request,
     db: AsyncSession = Depends(db_session_dep),
-) -> ApiMessage:
+) -> PasswordResetRequestResponse:
     settings = get_settings()
     limit_key = f"password-reset:{payload.email.lower()}:{request.client.host if request.client else 'unknown'}"
     allowed = await check_rate_limit(
@@ -116,9 +120,13 @@ async def password_reset_request(
         window_seconds=3600,
     )
     if not allowed:
-        return ApiMessage(message="If the account exists, reset instructions will be sent")
-    await auth_service.password_reset_request(db, payload.email)
-    return ApiMessage(message="If the account exists, reset instructions will be sent")
+        return PasswordResetRequestResponse(message="If the account exists, reset instructions will be sent")
+
+    token = await auth_service.password_reset_request(db, payload.email)
+    return PasswordResetRequestResponse(
+        message="If the account exists, reset instructions will be sent",
+        reset_token=token if settings.debug else None,
+    )
 
 
 @router.post("/password-reset/confirm", response_model=ApiMessage)

@@ -5,11 +5,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import db_session_dep, get_current_user
+from app.core.config import get_settings
 from app.models import TrustedContact, User
 from app.schemas.common import ApiMessage
 from app.schemas.trusted_contacts import (
     TrustedContactCreateRequest,
     TrustedContactInviteRequest,
+    TrustedContactInviteResponse,
     TrustedContactResponse,
 )
 from app.services import trusted_contacts as contact_service
@@ -49,15 +51,19 @@ async def list_contacts(user: User = Depends(get_current_user), db: AsyncSession
     ]
 
 
-@router.post("/{trusted_contact_id}/invite", response_model=ApiMessage)
+@router.post("/{trusted_contact_id}/invite", response_model=TrustedContactInviteResponse)
 async def invite_contact(
     trusted_contact_id: str,
     payload: TrustedContactInviteRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(db_session_dep),
-) -> ApiMessage:
-    message, _token = await contact_service.send_invite(db, user.id, trusted_contact_id, payload.force_reissue)
-    return ApiMessage(message=message)
+) -> TrustedContactInviteResponse:
+    message, token = await contact_service.send_invite(db, user.id, trusted_contact_id, payload.force_reissue)
+    settings = get_settings()
+    return TrustedContactInviteResponse(
+        message=message,
+        invite_token=token if settings.debug else None,
+    )
 
 
 @router.post("/invite/accept", response_model=ApiMessage)

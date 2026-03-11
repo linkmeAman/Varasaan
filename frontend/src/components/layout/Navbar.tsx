@@ -1,14 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { ShieldCheck, Menu, X } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Menu, ShieldCheck, X } from 'lucide-react';
+
+import { apiClient } from '../../lib/api-client';
+import { clearTokenPair, getRefreshToken, hasSessionTokens } from '../../lib/session';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -20,6 +25,21 @@ export default function Navbar() {
   }, []);
 
   const isHome = pathname === '/';
+  const hasSession = hasSessionTokens();
+
+  const handleLogout = async () => {
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      try {
+        await apiClient.logout({ body: { refresh_token: refreshToken } });
+      } catch {
+        // best-effort logout
+      }
+    }
+
+    clearTokenPair();
+    router.push('/login');
+  };
 
   return (
     <nav className={`navbar ${scrolled ? 'nav-scrolled glass-panel' : 'nav-transparent'}`}>
@@ -37,11 +57,11 @@ export default function Navbar() {
               <a href="#features" className="nav-link">
                 Features
               </a>
-              <a href="#how-it-works" className="nav-link">
-                How it Works
-              </a>
-              <Link href="/dashboard" className="nav-link">
-                Dashboard
+              <Link href="/register" className="nav-link">
+                Register
+              </Link>
+              <Link href="/login" className="nav-link">
+                Login
               </Link>
             </>
           ) : (
@@ -52,17 +72,29 @@ export default function Navbar() {
               <Link href="/dashboard/inventory" className="nav-link">
                 Inventory
               </Link>
-              <Link href="/executor" className="nav-link">
-                Executor
+              <Link href="/dashboard/trusted-contacts" className="nav-link">
+                Contacts
+              </Link>
+              <Link href="/dashboard/documents" className="nav-link">
+                Documents
+              </Link>
+              <Link href="/dashboard/billing" className="nav-link">
+                Billing
               </Link>
             </>
           )}
         </div>
 
         <div className="nav-actions">
-          <Link href="/dashboard" className="nav-cta animate-fade-in">
-            Get Started
-          </Link>
+          {hasSession ? (
+            <button type="button" className="nav-cta animate-fade-in" onClick={handleLogout}>
+              Sign Out
+            </button>
+          ) : (
+            <Link href="/login" className="nav-cta animate-fade-in">
+              Get Started
+            </Link>
+          )}
         </div>
 
         <button className="mobile-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>

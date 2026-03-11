@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Header, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import db_session_dep, get_current_user
+from app.core.config import get_settings
 from app.models import User
 from app.schemas.payments import (
     PaymentCheckoutRequest,
@@ -26,8 +27,12 @@ async def create_checkout(
     db: AsyncSession = Depends(db_session_dep),
 ) -> PaymentCheckoutResponse:
     payment = await payment_service.create_checkout_order(db, user.id, payload)
+    settings = get_settings()
     return PaymentCheckoutResponse(
         order_id=payment.order_id,
+        provider="razorpay",
+        provider_order_id=payment.order_id,
+        checkout_key_id=settings.razorpay_key_id,
         amount_paise=payment.amount_paise,
         currency=payment.currency,
         status=payment.latest_status.value,

@@ -13,93 +13,30 @@ export const openApiDocument = {
     }
   ],
   "paths": {
-    "/healthz": {
-      "get": {
-        "tags": [
-          "health"
-        ],
-        "operationId": "healthz",
-        "responses": {
-          "200": {
-            "description": "Service is healthy",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "status"
-                  ],
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "const": "ok"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/auth/signup": {
+    "/api/v1/auth/jurisdiction/confirm": {
       "post": {
         "tags": [
           "auth"
         ],
-        "operationId": "signup",
+        "operationId": "confirmJurisdiction",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SignupRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Signup accepted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SignupResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/TooManyRequests"
-          }
-        }
-      }
-    },
-    "/api/v1/auth/verify-email": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "operationId": "verifyEmail",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EmailVerificationRequest"
+                "$ref": "#/components/schemas/JurisdictionConfirmRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Email verified",
+            "description": "Jurisdiction confirmed",
             "content": {
               "application/json": {
                 "schema": {
@@ -108,8 +45,8 @@ export const openApiDocument = {
               }
             }
           },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
           }
         }
       }
@@ -149,39 +86,6 @@ export const openApiDocument = {
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
-          }
-        }
-      }
-    },
-    "/api/v1/auth/refresh": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "operationId": "refreshSession",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RefreshRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Rotated token pair",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TokenPair"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
           }
         }
       }
@@ -244,32 +148,30 @@ export const openApiDocument = {
         }
       }
     },
-    "/api/v1/auth/password-reset/request": {
-      "post": {
+    "/api/v1/auth/me": {
+      "get": {
         "tags": [
           "auth"
         ],
-        "operationId": "passwordResetRequest",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PasswordResetRequest"
-              }
-            }
+        "operationId": "currentUser",
+        "security": [
+          {
+            "bearerAuth": []
           }
-        },
+        ],
         "responses": {
           "200": {
-            "description": "Generic response",
+            "description": "Current user context",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiMessage"
+                  "$ref": "#/components/schemas/UserSessionResponse"
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
           }
         }
       }
@@ -307,29 +209,29 @@ export const openApiDocument = {
         }
       }
     },
-    "/api/v1/auth/recovery/request": {
+    "/api/v1/auth/password-reset/request": {
       "post": {
         "tags": [
           "auth"
         ],
-        "operationId": "recoveryRequest",
+        "operationId": "passwordResetRequest",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RecoveryRequest"
+                "$ref": "#/components/schemas/PasswordResetRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Generic recovery response",
+            "description": "Generic response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RecoveryRequestResponse"
+                  "$ref": "#/components/schemas/PasswordResetRequestResponse"
                 }
               }
             }
@@ -409,30 +311,127 @@ export const openApiDocument = {
         }
       }
     },
-    "/api/v1/auth/jurisdiction/confirm": {
+    "/api/v1/auth/recovery/request": {
       "post": {
         "tags": [
           "auth"
         ],
-        "operationId": "confirmJurisdiction",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "operationId": "recoveryRequest",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/JurisdictionConfirmRequest"
+                "$ref": "#/components/schemas/RecoveryRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Jurisdiction confirmed",
+            "description": "Generic recovery response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryRequestResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "refreshSession",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rotated token pair",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPair"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/signup": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "signup",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Signup accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/verify-email": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "verifyEmail",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailVerificationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email verified",
             "content": {
               "application/json": {
                 "schema": {
@@ -441,18 +440,18 @@ export const openApiDocument = {
               }
             }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           }
         }
       }
     },
-    "/api/v1/auth/me": {
+    "/api/v1/documents": {
       "get": {
         "tags": [
-          "auth"
+          "documents"
         ],
-        "operationId": "currentUser",
+        "operationId": "listDocuments",
         "security": [
           {
             "bearerAuth": []
@@ -460,68 +459,20 @@ export const openApiDocument = {
         ],
         "responses": {
           "200": {
-            "description": "Current user context",
+            "description": "Documents",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserSessionResponse"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentSummaryResponse"
+                  }
                 }
               }
             }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
-          }
-        }
-      }
-    },
-    "/api/v1/legal/policies": {
-      "post": {
-        "tags": [
-          "legal"
-        ],
-        "operationId": "createPolicy",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LegalPolicyCreateRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Policy created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LegalPolicyResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "legal"
-        ],
-        "operationId": "listPolicies",
-        "responses": {
-          "200": {
-            "description": "Active policy versions",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/LegalPolicyResponse"
-                  }
-                }
-              }
-            }
           }
         }
       }
@@ -570,12 +521,12 @@ export const openApiDocument = {
         }
       }
     },
-    "/api/v1/documents/{documentId}/versions/init": {
-      "post": {
+    "/api/v1/documents/versions/{versionId}": {
+      "get": {
         "tags": [
           "documents"
         ],
-        "operationId": "initDocumentVersionUpload",
+        "operationId": "getDocumentVersion",
         "security": [
           {
             "bearerAuth": []
@@ -583,32 +534,19 @@ export const openApiDocument = {
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/DocumentId"
+            "$ref": "#/components/parameters/VersionId"
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UploadInitRequest"
-              }
-            }
-          }
-        },
         "responses": {
-          "201": {
-            "description": "Upload material issued",
+          "200": {
+            "description": "Document version status",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UploadInitResponse"
+                  "$ref": "#/components/schemas/DocumentVersionStatusResponse"
                 }
               }
             }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -642,6 +580,76 @@ export const openApiDocument = {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScanDispatchResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}": {
+      "delete": {
+        "tags": [
+          "documents"
+        ],
+        "operationId": "softDeleteDocument",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DocumentId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Soft deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiMessage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "operationId": "getDocument",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DocumentId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDetailResponse"
                 }
               }
             }
@@ -742,12 +750,12 @@ export const openApiDocument = {
         }
       }
     },
-    "/api/v1/documents/{documentId}": {
-      "delete": {
+    "/api/v1/documents/{documentId}/versions/init": {
+      "post": {
         "tags": [
           "documents"
         ],
-        "operationId": "softDeleteDocument",
+        "operationId": "initDocumentVersionUpload",
         "security": [
           {
             "bearerAuth": []
@@ -758,19 +766,32 @@ export const openApiDocument = {
             "$ref": "#/components/parameters/DocumentId"
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadInitRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
-            "description": "Soft deleted",
+          "201": {
+            "description": "Upload material issued",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiMessage"
+                  "$ref": "#/components/schemas/UploadInitResponse"
                 }
               }
             }
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -832,45 +853,6 @@ export const openApiDocument = {
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
-          }
-        }
-      }
-    },
-    "/api/v1/exports/{exportJobId}/token": {
-      "post": {
-        "tags": [
-          "exports"
-        ],
-        "operationId": "issueExportToken",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ExportJobId"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Token issued",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExportTokenResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "410": {
-            "$ref": "#/components/responses/Gone"
           }
         }
       }
@@ -959,6 +941,231 @@ export const openApiDocument = {
           },
           "410": {
             "$ref": "#/components/responses/Gone"
+          }
+        }
+      }
+    },
+    "/api/v1/exports/{exportJobId}/token": {
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "operationId": "issueExportToken",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ExportJobId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportTokenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "410": {
+            "$ref": "#/components/responses/Gone"
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/accounts": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "createInventoryAccount",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Inventory account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "listInventoryAccounts",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inventory accounts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InventoryResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/accounts/{accountId}": {
+      "put": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "updateInventoryAccount",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InventoryAccountId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inventory account updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "inventory"
+        ],
+        "operationId": "deleteInventoryAccount",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InventoryAccountId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inventory account deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiMessage"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/legal/policies": {
+      "post": {
+        "tags": [
+          "legal"
+        ],
+        "operationId": "createPolicy",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegalPolicyCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Policy created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalPolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "legal"
+        ],
+        "operationId": "listPolicies",
+        "responses": {
+          "200": {
+            "description": "Active policy versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LegalPolicyResponse"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -1066,44 +1273,6 @@ export const openApiDocument = {
         }
       }
     },
-    "/api/v1/payments/{orderId}": {
-      "get": {
-        "tags": [
-          "payments"
-        ],
-        "operationId": "getPayment",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "orderId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Payment status",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PaymentStatusResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
-        }
-      }
-    },
     "/api/v1/payments/webhook": {
       "post": {
         "tags": [
@@ -1143,6 +1312,44 @@ export const openApiDocument = {
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/payments/{orderId}": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "operationId": "getPayment",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -1204,49 +1411,6 @@ export const openApiDocument = {
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/v1/trusted-contacts/{trustedContactId}/invite": {
-      "post": {
-        "tags": [
-          "trusted-contacts"
-        ],
-        "operationId": "inviteTrustedContact",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TrustedContactId"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TrustedContactInviteRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Invite queued",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiMessage"
-                }
-              }
-            }
-          },
-          "429": {
-            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -1317,15 +1481,20 @@ export const openApiDocument = {
         }
       }
     },
-    "/api/v1/inventory/accounts": {
+    "/api/v1/trusted-contacts/{trustedContactId}/invite": {
       "post": {
         "tags": [
-          "inventory"
+          "trusted-contacts"
         ],
-        "operationId": "createInventoryAccount",
+        "operationId": "inviteTrustedContact",
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TrustedContactId"
           }
         ],
         "requestBody": {
@@ -1333,43 +1502,49 @@ export const openApiDocument = {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/InventoryCreateRequest"
+                "$ref": "#/components/schemas/TrustedContactInviteRequest"
               }
             }
           }
         },
         "responses": {
-          "201": {
-            "description": "Inventory account created",
+          "200": {
+            "description": "Invite queued",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InventoryResponse"
+                  "$ref": "#/components/schemas/TrustedContactInviteResponse"
                 }
               }
             }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
-      },
+      }
+    },
+    "/healthz": {
       "get": {
         "tags": [
-          "inventory"
+          "health"
         ],
-        "operationId": "listInventoryAccounts",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "operationId": "healthz",
         "responses": {
           "200": {
-            "description": "Inventory accounts",
+            "description": "Service is healthy",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/InventoryResponse"
+                  "type": "object",
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "ok"
+                    }
                   }
                 }
               }
@@ -1426,6 +1601,15 @@ export const openApiDocument = {
       },
       "TrustedContactId": {
         "name": "trustedContactId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "InventoryAccountId": {
+        "name": "accountId",
         "in": "path",
         "required": true,
         "schema": {
@@ -1625,6 +1809,10 @@ export const openApiDocument = {
         "properties": {
           "message": {
             "type": "string"
+          },
+          "verification_token": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -2076,6 +2264,8 @@ export const openApiDocument = {
         "type": "object",
         "required": [
           "order_id",
+          "provider",
+          "provider_order_id",
           "amount_paise",
           "currency",
           "status"
@@ -2083,6 +2273,16 @@ export const openApiDocument = {
         "properties": {
           "order_id": {
             "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "provider_order_id": {
+            "type": "string"
+          },
+          "checkout_key_id": {
+            "type": "string",
+            "nullable": true
           },
           "amount_paise": {
             "type": "integer"
@@ -2379,6 +2579,173 @@ export const openApiDocument = {
             "type": "integer"
           }
         }
+      },
+      "PasswordResetRequestResponse": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "reset_token": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TrustedContactInviteResponse": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "invite_token": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "InventoryUpdateRequest": {
+        "type": "object",
+        "required": [
+          "platform",
+          "category",
+          "importance_level"
+        ],
+        "properties": {
+          "platform": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "username_hint": {
+            "type": "string",
+            "nullable": true
+          },
+          "importance_level": {
+            "type": "integer"
+          }
+        }
+      },
+      "DocumentVersionStatusResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "document_id",
+          "version_no",
+          "state",
+          "object_key",
+          "size_bytes",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_no": {
+            "type": "integer"
+          },
+          "state": {
+            "type": "string"
+          },
+          "object_key": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer"
+          },
+          "sha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scan_status": {
+            "type": "string",
+            "nullable": true
+          },
+          "scan_summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "scan_failed_purge_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "DocumentSummaryResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "doc_type",
+          "state",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doc_type": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "current_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "current_version": {
+            "$ref": "#/components/schemas/DocumentVersionStatusResponse"
+          }
+        }
+      },
+      "DocumentDetailResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/DocumentSummaryResponse"
+          },
+          {
+            "type": "object",
+            "required": [
+              "versions"
+            ],
+            "properties": {
+              "versions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DocumentVersionStatusResponse"
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }

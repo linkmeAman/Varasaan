@@ -1,26 +1,62 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ShieldAlert, ArrowRight } from 'lucide-react';
+
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { apiClient } from '../lib/api-client';
+import { hasSessionTokens, storeTokenPair } from '../lib/session';
+
+function extractErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === 'object' && error !== null) {
+    const errorObj = error as { response?: { data?: { error?: { message?: string } } } };
+    const message = errorObj.response?.data?.error?.message;
+    if (typeof message === 'string' && message.trim()) {
+      return message;
+    }
+  }
+  return fallback;
+}
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [feedback, setFeedback] = useState('');
+
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (hasSessionTokens()) {
+      const next = searchParams.get('next') || '/dashboard';
+      router.replace(next);
+    }
+  }, [router, searchParams]);
+
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
     setIsLoading(true);
+    setFeedback('');
 
-    setTimeout(() => {
+    try {
+      const tokenPair = await apiClient.login({
+        body: {
+          email: email.trim(),
+          password,
+        },
+      });
+      storeTokenPair(tokenPair);
+      const next = searchParams.get('next') || '/dashboard';
+      router.push(next);
+    } catch (error) {
+      setFeedback(extractErrorMessage(error, 'Unable to login. Check your credentials and try again.'));
+    } finally {
       setIsLoading(false);
-      router.push('/dashboard');
-    }, 1200);
+    }
   };
 
   return (
@@ -40,7 +76,7 @@ export default function Login() {
             type="email"
             placeholder="you@domain.com"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(event) => setEmail(event.target.value)}
             required
           />
 
@@ -50,13 +86,15 @@ export default function Login() {
               type="password"
               placeholder="••••••••"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               required
             />
             <Link href="/recovery" className="forgot-link">
               Forgot password?
             </Link>
           </div>
+
+          {feedback && <p className="input-error-msg">{feedback}</p>}
 
           <Button type="submit" className="w-full mt-4" size="lg" isLoading={isLoading}>
             Sign In to Vault <ArrowRight size={18} />
@@ -65,8 +103,7 @@ export default function Login() {
 
         <div className="auth-footer">
           <p>
-            Don't have an account?{' '}
-            <Link href="/register">Start Planning Here</Link>
+            Don&apos;t have an account? <Link href="/register">Start Planning Here</Link>
           </p>
         </div>
       </div>

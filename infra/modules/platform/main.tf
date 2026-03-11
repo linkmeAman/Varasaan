@@ -1,8 +1,8 @@
 locals {
-  name_prefix      = "${var.project_name}-${var.environment}"
-  web_origin_id    = "${local.name_prefix}-web-origin"
-  ssm_path_prefix  = "/${var.project_name}/${var.environment}"
-  common_tags = {
+  name_prefix     = "${var.project_name}-${var.environment}"
+  web_origin_id   = "${local.name_prefix}-web-origin"
+  ssm_path_prefix = "/${var.project_name}/${var.environment}"
+  common_tags     = {
     Project     = var.project_name
     Environment = var.environment
     ManagedBy   = "terraform"
@@ -160,7 +160,7 @@ resource "aws_iam_role_policy" "ecs_task_runtime" {
   role = aws_iam_role.ecs_task.id
 
   policy = jsonencode({
-    Version = "2012-10-17"
+    Version   = "2012-10-17"
     Statement = [
       {
         Effect = "Allow"
@@ -187,9 +187,9 @@ resource "aws_ecs_task_definition" "api" {
 
   container_definitions = jsonencode([
     {
-      name      = "api"
-      image     = var.api_image
-      essential = true
+      name         = "api"
+      image        = var.api_image
+      essential    = true
       portMappings = [
         {
           containerPort = var.api_container_port
@@ -205,7 +205,7 @@ resource "aws_ecs_task_definition" "api" {
       ]
       logConfiguration = {
         logDriver = "awslogs"
-        options = {
+        options   = {
           awslogs-group         = aws_cloudwatch_log_group.api.name
           awslogs-region        = var.aws_region
           awslogs-stream-prefix = "ecs"
@@ -373,7 +373,7 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values = [
+      values   = [
         "repo:${var.github_repository}:ref:refs/heads/main",
         "repo:${var.github_repository}:ref:refs/tags/v*"
       ]
@@ -392,7 +392,7 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
   role = aws_iam_role.github_actions.id
 
   policy = jsonencode({
-    Version = "2012-10-17"
+    Version   = "2012-10-17"
     Statement = [
       {
         Effect = "Allow"

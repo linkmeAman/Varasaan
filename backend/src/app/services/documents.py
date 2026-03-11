@@ -392,6 +392,27 @@ async def get_version_for_user(db: AsyncSession, user_id: str, version_id: str) 
     return version
 
 
+async def list_documents_for_user(db: AsyncSession, user_id: str) -> list[Document]:
+    result = await db.execute(
+        select(Document).where(Document.user_id == user_id).order_by(Document.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def list_versions_for_document(db: AsyncSession, document_id: str) -> list[DocumentVersion]:
+    result = await db.execute(
+        select(DocumentVersion)
+        .where(DocumentVersion.document_id == document_id)
+        .order_by(DocumentVersion.version_no.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def get_scan_for_version(db: AsyncSession, version_id: str) -> MalwareScan | None:
+    result = await db.execute(select(MalwareScan).where(MalwareScan.version_id == version_id))
+    return result.scalars().first()
+
+
 async def orchestrate_malware_scan(db: AsyncSession, version_id: str) -> MalwareScan:
     settings = get_settings()
     version = await db.get(DocumentVersion, version_id)
@@ -429,3 +450,4 @@ async def orchestrate_malware_scan(db: AsyncSession, version_id: str) -> Malware
     )
     refreshed = await db.execute(select(MalwareScan).where(MalwareScan.version_id == version_id))
     return refreshed.scalars().first() or scan
+
