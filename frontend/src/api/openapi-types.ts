@@ -13,6 +13,26 @@ export const openApiDocument = {
     }
   ],
   "paths": {
+    "/api/v1/auth/csrf": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "csrfToken",
+        "responses": {
+          "200": {
+            "description": "CSRF token issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CsrfTokenResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/jurisdiction/confirm": {
       "post": {
         "tags": [
@@ -97,7 +117,6 @@ export const openApiDocument = {
         ],
         "operationId": "logout",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -348,7 +367,6 @@ export const openApiDocument = {
         ],
         "operationId": "refreshSession",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -1834,23 +1852,19 @@ export const openApiDocument = {
       },
       "RefreshRequest": {
         "type": "object",
-        "required": [
-          "refresh_token"
-        ],
         "properties": {
           "refresh_token": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           }
         }
       },
       "LogoutRequest": {
         "type": "object",
-        "required": [
-          "refresh_token"
-        ],
         "properties": {
           "refresh_token": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -1983,6 +1997,17 @@ export const openApiDocument = {
         ],
         "properties": {
           "message": {
+            "type": "string"
+          }
+        }
+      },
+      "CsrfTokenResponse": {
+        "type": "object",
+        "required": [
+          "csrf_token"
+        ],
+        "properties": {
+          "csrf_token": {
             "type": "string"
           }
         }

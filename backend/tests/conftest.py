@@ -53,7 +53,7 @@ async def test_context(monkeypatch: pytest.MonkeyPatch):
     runtime_dir = runtime_root / f"ctx-{uuid4().hex}"
     runtime_dir.mkdir(parents=False, exist_ok=False)
 
-    db_url_path = Path("tests/.tmp") / runtime_dir.name / "test.db"
+    db_url_path = runtime_dir / "test.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{db_url_path.as_posix()}")
     monkeypatch.setenv("DEBUG", "true")
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key")
@@ -108,6 +108,3 @@ async def test_context(monkeypatch: pytest.MonkeyPatch):
     await engine.dispose()
 
     shutil.rmtree(runtime_dir, ignore_errors=True)
-
-
-

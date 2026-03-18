@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     celery_broker_url: str | None = None
     celery_result_backend: str | None = None
     celery_task_always_eager: bool = False
+    auto_create_schema: bool = False
+    mock_external_services: bool = False
 
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 7
@@ -46,6 +48,14 @@ class Settings(BaseSettings):
 
     csp_connect_src: str = "'self' http://localhost:8000"
     cors_allow_origins: str = "http://localhost:3000,http://localhost:5173,https://varasaan-staging.vercel.app,https://varasaan.vercel.app"
+    access_cookie_name: str = "varasaan_access_token"
+    refresh_cookie_name: str = "varasaan_refresh_token"
+    csrf_cookie_name: str = "varasaan_csrf_token"
+    csrf_header_name: str = "X-CSRF-Token"
+    session_cookie_domain: str | None = None
+    session_cookie_path: str = "/"
+    session_cookie_secure: bool = False
+    session_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
 
     razorpay_webhook_secret: str = "dev-razorpay-secret"
     razorpay_key_id: str | None = None
@@ -54,8 +64,11 @@ class Settings(BaseSettings):
     email_from_address: str = "no-reply@varasaan.local"
     postmark_server_token: str | None = None
     frontend_base_url: str = "http://localhost:3000"
+    api_base_url: str = "http://localhost:8000"
 
     sentry_dsn: str | None = None
+    sentry_release: str | None = None
+    sentry_traces_sample_rate: float = 0.0
 
     aws_region: str = "ap-south-1"
     s3_bucket_documents: str = "varasaan-documents"
@@ -99,6 +112,13 @@ class Settings(BaseSettings):
                 return True
             if normalized in {"0", "false", "off", "no"}:
                 return False
+        return value
+
+    @field_validator("session_cookie_samesite", mode="before")
+    @classmethod
+    def _coerce_samesite(cls, value):
+        if isinstance(value, str):
+            return value.strip().lower()
         return value
 
 

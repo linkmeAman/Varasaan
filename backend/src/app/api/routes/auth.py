@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import check_rate_limit, db_session_dep, get_current_user
-from app.core.config import get_settings
+from app.api.deps import check_rate_limit, db_session_dep, enforce_csrf, get_current_user
+from app.core.config import Settings, get_settings
+from app.core.security import generate_token_secret
 from app.models import User
 from app.schemas.auth import (
+    CsrfTokenResponse,
     EmailVerificationRequest,
     JurisdictionConfirmRequest,
     LoginRequest,
@@ -30,6 +33,84 @@ from app.schemas.common import ApiMessage, TokenPair
 from app.services import auth as auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _cookie_max_age(expires_at: datetime) -> int:
+    return max(0, int((expires_at - datetime.now(UTC)).total_seconds()))
+
+
+def _set_cookie(response: Response, settings: Settings, *, name: str, value: str, max_age: int, http_only: bool) -> None:
+    response.set_cookie(
+        key=name,
+        value=value,
+        max_age=max_age,
+        httponly=http_only,
+        secure=settings.session_cookie_secure,
+        samesite=settings.session_cookie_samesite,
+        domain=settings.session_cookie_domain,
+        path=settings.session_cookie_path,
+    )
+
+
+def _set_session_cookies(
+    response: Response,
+    settings: Settings,
+    *,
+    access_token: str,
+    access_expires_at: datetime,
+    refresh_token: str,
+    refresh_expires_at: datetime,
+    csrf_token: str,
+) -> None:
+    _set_cookie(
+        response,
+        settings,
+        name=settings.access_cookie_name,
+        value=access_token,
+        max_age=_cookie_max_age(access_expires_at),
+        http_only=True,
+    )
+    _set_cookie(
+        response,
+        settings,
+        name=settings.refresh_cookie_name,
+        value=refresh_token,
+        max_age=_cookie_max_age(refresh_expires_at),
+        http_only=True,
+    )
+    _set_cookie(
+        response,
+        settings,
+        name=settings.csrf_cookie_name,
+        value=csrf_token,
+        max_age=_cookie_max_age(refresh_expires_at),
+        http_only=False,
+    )
+
+
+def _clear_session_cookies(response: Response, settings: Settings) -> None:
+    for cookie_name in (settings.access_cookie_name, settings.refresh_cookie_name, settings.csrf_cookie_name):
+        response.delete_cookie(
+            key=cookie_name,
+            domain=settings.session_cookie_domain,
+            path=settings.session_cookie_path,
+        )
+
+
+@router.get("/csrf", response_model=CsrfTokenResponse)
+async def csrf(request: Request) -> Response:
+    settings = get_settings()
+    token = request.cookies.get(settings.csrf_cookie_name) or generate_token_secret()
+    response = JSONResponse(content=CsrfTokenResponse(csrf_token=token).model_dump())
+    _set_cookie(
+        response,
+        settings,
+        name=settings.csrf_cookie_name,
+        value=token,
+        max_age=24 * 60 * 60,
+        http_only=False,
+    )
+    return response
 
 
 @router.post("/signup", response_model=SignupResponse, status_code=status.HTTP_201_CREATED)
@@ -58,7 +139,7 @@ async def verify_email(payload: EmailVerificationRequest, db: AsyncSession = Dep
 
 
 @router.post("/login", response_model=TokenPair)
-async def login(payload: LoginRequest, request: Request, db: AsyncSession = Depends(db_session_dep)) -> TokenPair:
+async def login(payload: LoginRequest, request: Request, db: AsyncSession = Depends(db_session_dep)) -> Response:
     settings = get_settings()
     limit_key = f"login:{payload.email.lower()}:{request.client.host if request.client else 'unknown'}"
     allowed = await check_rate_limit(
@@ -72,38 +153,98 @@ async def login(payload: LoginRequest, request: Request, db: AsyncSession = Depe
     access_token, access_expires, refresh_token, refresh_expires = await auth_service.login(
         db, payload.email, payload.password
     )
-    return TokenPair(
+    token_pair = TokenPair(
         access_token=access_token,
         access_token_expires_at=access_expires,
         refresh_token=refresh_token,
         refresh_token_expires_at=refresh_expires,
     )
+
+    response = JSONResponse(content=token_pair.model_dump(mode="json"))
+    _set_session_cookies(
+        response,
+        settings,
+        access_token=access_token,
+        access_expires_at=access_expires,
+        refresh_token=refresh_token,
+        refresh_expires_at=refresh_expires,
+        csrf_token=generate_token_secret(),
+    )
+    return response
 
 
 @router.post("/refresh", response_model=TokenPair)
-async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(db_session_dep)) -> TokenPair:
-    access_token, access_expires, refresh_token, refresh_expires = await auth_service.refresh_session(
+async def refresh(
+    request: Request,
+    payload: RefreshRequest | None = None,
+    db: AsyncSession = Depends(db_session_dep),
+) -> Response:
+    settings = get_settings()
+
+    body_refresh_token = payload.refresh_token if payload and payload.refresh_token else None
+    cookie_refresh_token = request.cookies.get(settings.refresh_cookie_name)
+
+    refresh_token = body_refresh_token or cookie_refresh_token
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
+
+    if body_refresh_token is None and cookie_refresh_token:
+        enforce_csrf(request)
+
+    access_token, access_expires, new_refresh_token, refresh_expires = await auth_service.refresh_session(
         db,
-        payload.refresh_token,
+        refresh_token,
     )
-    return TokenPair(
+    token_pair = TokenPair(
         access_token=access_token,
         access_token_expires_at=access_expires,
-        refresh_token=refresh_token,
+        refresh_token=new_refresh_token,
         refresh_token_expires_at=refresh_expires,
     )
 
+    response = JSONResponse(content=token_pair.model_dump(mode="json"))
+    _set_session_cookies(
+        response,
+        settings,
+        access_token=access_token,
+        access_expires_at=access_expires,
+        refresh_token=new_refresh_token,
+        refresh_expires_at=refresh_expires,
+        csrf_token=generate_token_secret(),
+    )
+    return response
+
 
 @router.post("/logout", response_model=ApiMessage)
-async def logout(payload: LogoutRequest, db: AsyncSession = Depends(db_session_dep)) -> ApiMessage:
-    await auth_service.revoke_session(db, payload.refresh_token)
-    return ApiMessage(message="Logged out")
+async def logout(
+    request: Request,
+    payload: LogoutRequest | None = None,
+    db: AsyncSession = Depends(db_session_dep),
+) -> Response:
+    settings = get_settings()
+
+    body_refresh_token = payload.refresh_token if payload and payload.refresh_token else None
+    cookie_refresh_token = request.cookies.get(settings.refresh_cookie_name)
+    refresh_token = body_refresh_token or cookie_refresh_token
+
+    if body_refresh_token is None and cookie_refresh_token:
+        enforce_csrf(request)
+
+    if refresh_token:
+        await auth_service.revoke_session(db, refresh_token)
+
+    response = JSONResponse(content=ApiMessage(message="Logged out").model_dump())
+    _clear_session_cookies(response, settings)
+    return response
 
 
 @router.post("/logout-all", response_model=ApiMessage)
-async def logout_all(user: User = Depends(get_current_user), db: AsyncSession = Depends(db_session_dep)) -> ApiMessage:
+async def logout_all(user: User = Depends(get_current_user), db: AsyncSession = Depends(db_session_dep)) -> Response:
+    settings = get_settings()
     await auth_service.revoke_all_sessions(db, user.id)
-    return ApiMessage(message="All sessions revoked")
+    response = JSONResponse(content=ApiMessage(message="All sessions revoked").model_dump())
+    _clear_session_cookies(response, settings)
+    return response
 
 
 @router.post("/password-reset/request", response_model=PasswordResetRequestResponse)

@@ -1,4 +1,4 @@
-from app.api.routes import auth, documents, exports, inventory, legal, packets, payments, trusted_contacts
+from app.api.routes import auth, documents, exports, inventory, legal, packets, payments, testing, trusted_contacts
 
 __all__ = [
     "auth",
@@ -8,5 +8,6 @@ __all__ = [
     "legal",
     "packets",
     "payments",
+    "testing",
     "trusted_contacts",
 ]

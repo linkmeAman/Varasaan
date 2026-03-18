@@ -1,50 +1,23 @@
-import type { TokenPair } from './api-client';
+const DEFAULT_CSRF_COOKIE_NAME = process.env.NEXT_PUBLIC_CSRF_COOKIE_NAME || 'varasaan_csrf_token';
 
-const ACCESS_TOKEN_KEY = 'access_token';
-const REFRESH_TOKEN_KEY = 'refresh_token';
-const ACCESS_TOKEN_EXPIRES_AT_KEY = 'access_token_expires_at';
-const REFRESH_TOKEN_EXPIRES_AT_KEY = 'refresh_token_expires_at';
-
-function canUseStorage(): boolean {
-  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+function canUseDocument(): boolean {
+  return typeof document !== 'undefined';
 }
 
-export function getAccessToken(): string | null {
-  if (!canUseStorage()) {
+export function getCookieValue(name: string): string | null {
+  if (!canUseDocument()) {
     return null;
   }
-  return window.localStorage.getItem(ACCESS_TOKEN_KEY);
-}
 
-export function getRefreshToken(): string | null {
-  if (!canUseStorage()) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const matcher = new RegExp(`(?:^|; )${escaped}=([^;]*)`);
+  const matched = document.cookie.match(matcher);
+  if (!matched) {
     return null;
   }
-  return window.localStorage.getItem(REFRESH_TOKEN_KEY);
+  return decodeURIComponent(matched[1]);
 }
 
-export function hasSessionTokens(): boolean {
-  return Boolean(getAccessToken() && getRefreshToken());
-}
-
-export function storeTokenPair(tokenPair: TokenPair): void {
-  if (!canUseStorage()) {
-    return;
-  }
-
-  window.localStorage.setItem(ACCESS_TOKEN_KEY, tokenPair.access_token);
-  window.localStorage.setItem(REFRESH_TOKEN_KEY, tokenPair.refresh_token);
-  window.localStorage.setItem(ACCESS_TOKEN_EXPIRES_AT_KEY, tokenPair.access_token_expires_at);
-  window.localStorage.setItem(REFRESH_TOKEN_EXPIRES_AT_KEY, tokenPair.refresh_token_expires_at);
-}
-
-export function clearTokenPair(): void {
-  if (!canUseStorage()) {
-    return;
-  }
-
-  window.localStorage.removeItem(ACCESS_TOKEN_KEY);
-  window.localStorage.removeItem(REFRESH_TOKEN_KEY);
-  window.localStorage.removeItem(ACCESS_TOKEN_EXPIRES_AT_KEY);
-  window.localStorage.removeItem(REFRESH_TOKEN_EXPIRES_AT_KEY);
+export function getCsrfTokenFromCookie(): string | null {
+  return getCookieValue(DEFAULT_CSRF_COOKIE_NAME);
 }

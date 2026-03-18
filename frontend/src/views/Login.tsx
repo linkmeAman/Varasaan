@@ -3,12 +3,11 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ShieldAlert, ArrowRight } from 'lucide-react';
+import { ArrowRight, ShieldAlert } from 'lucide-react';
 
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { apiClient } from '../lib/api-client';
-import { hasSessionTokens, storeTokenPair } from '../lib/session';
 
 function extractErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === 'object' && error !== null) {
@@ -31,10 +30,24 @@ export default function Login() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (hasSessionTokens()) {
-      const next = searchParams.get('next') || '/dashboard';
-      router.replace(next);
-    }
+    let mounted = true;
+    const checkExistingSession = async () => {
+      try {
+        await apiClient.currentUser();
+        if (!mounted) {
+          return;
+        }
+        const next = searchParams.get('next') || '/dashboard';
+        router.replace(next);
+      } catch {
+        // stay on login page
+      }
+    };
+
+    void checkExistingSession();
+    return () => {
+      mounted = false;
+    };
   }, [router, searchParams]);
 
   const handleLogin = async (event: React.FormEvent) => {
@@ -43,13 +56,12 @@ export default function Login() {
     setFeedback('');
 
     try {
-      const tokenPair = await apiClient.login({
+      await apiClient.login({
         body: {
           email: email.trim(),
           password,
         },
       });
-      storeTokenPair(tokenPair);
       const next = searchParams.get('next') || '/dashboard';
       router.push(next);
     } catch (error) {

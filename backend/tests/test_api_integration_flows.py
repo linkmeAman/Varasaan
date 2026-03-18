@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.models import Document, DocumentState
 from helpers import mark_user_verified, seed_active_policies, sign_webhook
 
@@ -12,6 +13,12 @@ pytestmark = pytest.mark.integration
 def _auth_header(access_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {access_token}"}
 
+
+def _csrf_header(test_context: dict) -> dict[str, str]:
+    settings = get_settings()
+    token = test_context["client"].cookies.get(settings.csrf_cookie_name)
+    assert token
+    return {settings.csrf_header_name: token}
 
 async def _signup_and_login(test_context, *, email: str, password: str) -> dict:
     client = test_context["client"]
@@ -75,6 +82,66 @@ async def test_auth_session_rotation_and_revocation(test_context):
     me_response = await client.get("/api/v1/auth/me", headers=_auth_header(access_1))
     assert me_response.status_code == 200, me_response.text
 
+
+@pytest.mark.asyncio
+async def test_cookie_auth_and_csrf_flow(test_context):
+    client = test_context["client"]
+    settings = get_settings()
+
+    await _signup_and_login(test_context, email="cookie-user@example.com", password="StrongPassw0rd!!123")
+
+    assert client.cookies.get(settings.access_cookie_name)
+    assert client.cookies.get(settings.refresh_cookie_name)
+    assert client.cookies.get(settings.csrf_cookie_name)
+
+    me_with_cookie = await client.get("/api/v1/auth/me")
+    assert me_with_cookie.status_code == 200, me_with_cookie.text
+
+    create_without_csrf = await client.post(
+        "/api/v1/inventory/accounts",
+        json={
+            "platform": "Dropbox",
+            "category": "storage",
+            "username_hint": "cookie-user@example.com",
+            "importance_level": 2,
+        },
+    )
+    assert create_without_csrf.status_code == 403, create_without_csrf.text
+
+    create_with_csrf = await client.post(
+        "/api/v1/inventory/accounts",
+        headers=_csrf_header(test_context),
+        json={
+            "platform": "Dropbox",
+            "category": "storage",
+            "username_hint": "cookie-user@example.com",
+            "importance_level": 2,
+        },
+    )
+    assert create_with_csrf.status_code == 201, create_with_csrf.text
+
+    old_csrf = client.cookies.get(settings.csrf_cookie_name)
+    refresh_with_cookie = await client.post(
+        "/api/v1/auth/refresh",
+        headers=_csrf_header(test_context),
+        json={},
+    )
+    assert refresh_with_cookie.status_code == 200, refresh_with_cookie.text
+    assert client.cookies.get(settings.csrf_cookie_name)
+    assert client.cookies.get(settings.csrf_cookie_name) != old_csrf
+
+    logout_with_cookie = await client.post(
+        "/api/v1/auth/logout",
+        headers=_csrf_header(test_context),
+        json={},
+    )
+    assert logout_with_cookie.status_code == 200, logout_with_cookie.text
+
+    assert client.cookies.get(settings.access_cookie_name) is None
+    assert client.cookies.get(settings.refresh_cookie_name) is None
+
+    me_after_logout = await client.get("/api/v1/auth/me")
+    assert me_after_logout.status_code == 401, me_after_logout.text
 
 @pytest.mark.asyncio
 async def test_auth_signup_and_password_reset_debug_tokens(test_context):

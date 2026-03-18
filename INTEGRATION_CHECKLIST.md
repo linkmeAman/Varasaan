@@ -1,21 +1,22 @@
 # Integration Checklist
 
-- Generated on: 2026-03-08 21:08 UTC
+- Generated on: 2026-03-16 18:55 UTC
 - Scope: frontend-backend contract sync for `packages/shared/openapi/openapi.yaml`
-- Result: contract, generated frontend client, and backend route + enum checks are aligned.
+- Result: contract, generated frontend client, cookie-auth flow, and backend route + enum checks are aligned.
 
 ## Endpoint-by-Endpoint Status
 
 | Method | Path | Operation | Request Payload | Success Payload | Verification | Status |
-|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- |
 | `GET` | `/healthz` | `healthz` | `-` | `object` | Contract + type sync | Synced |
+| `GET` | `/api/v1/auth/csrf` | `csrfToken` | `-` | `CsrfTokenResponse` | Contract + type sync | Synced |
 | `POST` | `/api/v1/auth/signup` | `signup` | `SignupRequest` | `SignupResponse` | Integration test | Synced |
 | `POST` | `/api/v1/auth/verify-email` | `verifyEmail` | `EmailVerificationRequest` | `ApiMessage` | Contract + type sync | Synced |
-| `POST` | `/api/v1/auth/login` | `login` | `LoginRequest` | `TokenPair` | Integration test | Synced |
-| `POST` | `/api/v1/auth/refresh` | `refreshSession` | `RefreshRequest` | `TokenPair` | Integration test | Synced |
-| `POST` | `/api/v1/auth/logout` | `logout` | `LogoutRequest` | `ApiMessage` | Integration test | Synced |
-| `POST` | `/api/v1/auth/logout-all` | `logoutAll` | `-` | `ApiMessage` | Integration test | Synced |
-| `POST` | `/api/v1/auth/password-reset/request` | `passwordResetRequest` | `PasswordResetRequest` | `ApiMessage` | Contract + type sync | Synced |
+| `POST` | `/api/v1/auth/login` | `login` | `LoginRequest` | `TokenPair` + cookies | Integration test | Synced |
+| `POST` | `/api/v1/auth/refresh` | `refreshSession` | `RefreshRequest?` | `TokenPair` + rotated cookies | Integration test | Synced |
+| `POST` | `/api/v1/auth/logout` | `logout` | `LogoutRequest?` | `ApiMessage` + cleared cookies | Integration test | Synced |
+| `POST` | `/api/v1/auth/logout-all` | `logoutAll` | `-` | `ApiMessage` + cleared cookies | Integration test | Synced |
+| `POST` | `/api/v1/auth/password-reset/request` | `passwordResetRequest` | `PasswordResetRequest` | `PasswordResetRequestResponse` | Contract + type sync | Synced |
 | `POST` | `/api/v1/auth/password-reset/confirm` | `passwordResetConfirm` | `PasswordResetConfirmRequest` | `ApiMessage` | Contract + type sync | Synced |
 | `POST` | `/api/v1/auth/recovery/request` | `recoveryRequest` | `RecoveryRequest` | `RecoveryRequestResponse` | Contract + type sync | Synced |
 | `POST` | `/api/v1/auth/recovery/assist` | `recoveryAssist` | `RecoveryAssistRequest` | `RecoveryAssistResponse` | Contract + type sync | Synced |
@@ -50,17 +51,13 @@
 
 ## Payload Compatibility
 
-- Frontend payload/request-response types are regenerated from the same OpenAPI source into `frontend/src/lib/generated/api-client.ts`.
-- Backend route surface is validated against the same contract in `backend/tests/test_contract_sync.py` (path+method parity).
+- Frontend payload/request-response types are regenerated from the same OpenAPI source into `frontend/src/lib/generated/api-client.ts` and `frontend/src/api/openapi-types.ts`.
+- Browser clients use credentialed cookies plus double-submit CSRF headers for mutating auth/session requests.
+- Backend route surface is validated against the same contract in `backend/tests/test_contract_sync.py` (path+method parity, excluding intentionally hidden testing routes).
 - Shared enum/status sets are validated in `backend/tests/test_contract_sync.py` for: `PolicyType`, `RecoveryMode`, `TrustedContactRole`, `TrustedContactStatus`, `PacketJobStatus`, `ExportJobStatus`, `PaymentStatus`.
 
 ## Known Gaps
 
-- Frontend `npm run build` is blocked in this environment by Node runtime version (`20.17.0`), while installed Vite requires `20.19+` or `22.12+`.
-- Backend tests pass, but pytest cache directory creation emits a warning due local filesystem permissions on `.pytest_cache`.
-- Not all endpoints currently have scenario-level integration tests; untested endpoints are still contract-verified and frontend-type-verified as shown above.
-
-## Redundancy Review (No Deletions Per Request)
-
-- Found generated artifacts and cache/temp folders (`frontend/dist`, `frontend/node_modules`, `backend/.pytest_cache`, `backend/tests/.tmp`, `backend/tmp_pytest`).
-- No files/folders were deleted to honor the no-deletion requirement.
+- Hidden mock-storage routes under `/api/v1/testing/*` are test-only and intentionally excluded from public OpenAPI.
+- Live Razorpay/Postmark validation still depends on staging credentials and must be executed as part of the launch runbook.
+- Alert routing is operationally validated through staging smoke checks; it is not exercised by unit or contract tests.

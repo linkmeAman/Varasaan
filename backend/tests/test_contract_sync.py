@@ -43,7 +43,7 @@ def _collect_contract_operations(contract: dict[str, Any]) -> set[tuple[str, str
 def _collect_app_operations() -> set[tuple[str, str]]:
     operations: set[tuple[str, str]] = set()
     for route in app.routes:
-        if not isinstance(route, APIRoute):
+        if not isinstance(route, APIRoute) or not route.include_in_schema:
             continue
         for method in route.methods:
             if method in HTTP_METHODS and (route.path == "/healthz" or route.path.startswith("/api/v1/")):

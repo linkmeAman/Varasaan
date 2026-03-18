@@ -28,7 +28,17 @@ Thumbs.db
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
-
+frontend/playwright-report/
+frontend/test-results/
 
 #.tools
 .tools/
+
+# Local E2E runtime artifacts
+.backend-e2e.dbpath
+.backend-e2e.pid
+.frontend-e2e.pid
+backend-e2e.log
+backend-e2e.err.log
+frontend-e2e.log
+frontend-e2e.err.log

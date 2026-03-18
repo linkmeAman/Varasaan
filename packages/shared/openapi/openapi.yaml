@@ -6,6 +6,18 @@ info:
 servers:
 - url: /
 paths:
+  /api/v1/auth/csrf:
+    get:
+      tags:
+      - auth
+      operationId: csrfToken
+      responses:
+        '200':
+          description: CSRF token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CsrfTokenResponse'
   /api/v1/auth/jurisdiction/confirm:
     post:
       tags:
@@ -58,7 +70,6 @@ paths:
       - auth
       operationId: logout
       requestBody:
-        required: true
         content:
           application/json:
             schema:
@@ -208,7 +219,6 @@ paths:
       - auth
       operationId: refreshSession
       requestBody:
-        required: true
         content:
           application/json:
             schema:
@@ -1091,18 +1101,16 @@ components:
           type: string
     RefreshRequest:
       type: object
-      required:
-      - refresh_token
       properties:
         refresh_token:
           type: string
+          nullable: true
     LogoutRequest:
       type: object
-      required:
-      - refresh_token
       properties:
         refresh_token:
           type: string
+          nullable: true
     EmailVerificationRequest:
       type: object
       required:
@@ -1192,6 +1200,13 @@ components:
       - message
       properties:
         message:
+          type: string
+    CsrfTokenResponse:
+      type: object
+      required:
+      - csrf_token
+      properties:
+        csrf_token:
           type: string
     UserSessionResponse:
       type: object

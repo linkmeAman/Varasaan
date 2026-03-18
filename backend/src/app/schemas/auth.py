@@ -25,11 +25,11 @@ class LoginRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None
 
 
 class LogoutRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str | None = None
 
 
 class EmailVerificationRequest(BaseModel):
@@ -88,3 +88,7 @@ class RecoveryRequestResponse(BaseModel):
 
 class RecoveryAssistResponse(BaseModel):
     message: str
+
+
+class CsrfTokenResponse(BaseModel):
+    csrf_token: str

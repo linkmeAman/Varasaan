@@ -11,8 +11,8 @@ export type ConsentInput = { policy_type: "privacy" | "terms"; policy_version: s
 export type SignupRequest = { email: string; password: string; full_name?: string | null; phone?: string | null; jurisdiction_code?: string; consents: ConsentInput[]; };
 export type SignupResponse = { message: string; verification_token?: string | null; };
 export type LoginRequest = { email: string; password: string; };
-export type RefreshRequest = { refresh_token: string; };
-export type LogoutRequest = { refresh_token: string; };
+export type RefreshRequest = { refresh_token?: string | null; };
+export type LogoutRequest = { refresh_token?: string | null; };
 export type EmailVerificationRequest = { token: string; };
 export type PasswordResetRequest = { email: string; };
 export type PasswordResetConfirmRequest = { token: string; new_password: string; };
@@ -22,6 +22,7 @@ export type RecoveryConfirmRequest = { recovery_token: string; new_password: str
 export type JurisdictionConfirmRequest = { jurisdiction_code: string; };
 export type RecoveryRequestResponse = { message: string; recovery_token?: string | null; approval_token?: string | null; };
 export type RecoveryAssistResponse = { message: string; };
+export type CsrfTokenResponse = { csrf_token: string; };
 export type UserSessionResponse = { id: string; email: string; email_verified: boolean; };
 export type TokenPair = { access_token: string; access_token_expires_at: string; refresh_token: string; refresh_token_expires_at: string; };
 export type UploadInitRequest = { doc_type: string; size_bytes: number; content_type?: string; sha256?: string | null; };
@@ -62,7 +63,7 @@ export interface LoginArgs {
 }
 
 export interface LogoutArgs {
-  body: LogoutRequest;
+  body?: LogoutRequest;
 }
 
 export interface PasswordResetConfirmArgs {
@@ -86,7 +87,7 @@ export interface RecoveryRequestArgs {
 }
 
 export interface RefreshSessionArgs {
-  body: RefreshRequest;
+  body?: RefreshRequest;
 }
 
 export interface SignupArgs {
@@ -210,6 +211,14 @@ export class VarasaanApiClient {
   private async request<TResponse>(config: AxiosRequestConfig): Promise<TResponse> {
     const response = await this.http.request<TResponse>(config);
     return response.data;
+  }
+
+  public async csrfToken(config: AxiosRequestConfig = {}): Promise<CsrfTokenResponse> {
+    return this.request<CsrfTokenResponse>({
+      ...config,
+      method: "GET",
+      url: `/api/v1/auth/csrf`,
+    });
   }
 
   public async confirmJurisdiction(args: ConfirmJurisdictionArgs, config: AxiosRequestConfig = {}): Promise<ApiMessage> {

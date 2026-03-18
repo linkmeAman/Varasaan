@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
 import { apiClient, type UserSessionResponse } from './api-client';
-import { clearTokenPair, hasSessionTokens } from './session';
 
 export function useAuthGuard() {
   const router = useRouter();
@@ -16,14 +15,7 @@ export function useAuthGuard() {
     let mounted = true;
 
     const verifySession = async () => {
-      if (!hasSessionTokens()) {
-        if (mounted) {
-          setIsLoading(false);
-          router.replace(`/login?next=${encodeURIComponent(pathname ?? '/dashboard')}`);
-        }
-        return;
-      }
-
+      setIsLoading(true);
       try {
         const current = await apiClient.currentUser();
         if (!mounted) {
@@ -32,10 +24,10 @@ export function useAuthGuard() {
         setUser(current);
         setIsLoading(false);
       } catch {
-        clearTokenPair();
         if (!mounted) {
           return;
         }
+        setUser(null);
         setIsLoading(false);
         router.replace(`/login?next=${encodeURIComponent(pathname ?? '/dashboard')}`);
       }

@@ -21,7 +21,12 @@ if settings.sentry_dsn:
     try:  # pragma: no cover
         import sentry_sdk
 
-        sentry_sdk.init(dsn=settings.sentry_dsn, environment=settings.env)
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            environment=settings.env,
+            release=settings.sentry_release,
+            traces_sample_rate=settings.sentry_traces_sample_rate,
+        )
     except Exception as exc:  # pragma: no cover
         logging.getLogger(__name__).warning("Sentry initialization skipped: %s", exc)
 
@@ -42,6 +47,19 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix=settings.api_prefix)
+
+
+@app.on_event("startup")
+async def maybe_bootstrap_schema() -> None:
+    if not settings.auto_create_schema:
+        return
+
+    from app.db.base import Base
+    from app.db.session import get_engine
+
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
 def _error(code: str, message: str, details: list[dict] | None = None) -> dict:

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import auth, documents, exports, inventory, legal, packets, payments, trusted_contacts
+from app.api.routes import auth, documents, exports, inventory, legal, packets, payments, testing, trusted_contacts
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
@@ -11,3 +11,4 @@ api_router.include_router(legal.router)
 api_router.include_router(packets.router)
 api_router.include_router(payments.router)
 api_router.include_router(trusted_contacts.router)
+api_router.include_router(testing.router)

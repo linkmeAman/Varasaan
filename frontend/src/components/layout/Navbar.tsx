@@ -6,11 +6,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Menu, ShieldCheck, X } from 'lucide-react';
 
 import { apiClient } from '../../lib/api-client';
-import { clearTokenPair, getRefreshToken, hasSessionTokens } from '../../lib/session';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
 
   const pathname = usePathname();
   const router = useRouter();
@@ -24,20 +24,39 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    const checkSession = async () => {
+      try {
+        await apiClient.currentUser();
+        if (mounted) {
+          setHasSession(true);
+        }
+      } catch {
+        if (mounted) {
+          setHasSession(false);
+        }
+      }
+    };
+
+    void checkSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, [pathname]);
+
   const isHome = pathname === '/';
-  const hasSession = hasSessionTokens();
 
   const handleLogout = async () => {
-    const refreshToken = getRefreshToken();
-    if (refreshToken) {
-      try {
-        await apiClient.logout({ body: { refresh_token: refreshToken } });
-      } catch {
-        // best-effort logout
-      }
+    try {
+      await apiClient.logout({});
+    } catch {
+      // best-effort logout
     }
 
-    clearTokenPair();
+    setHasSession(false);
     router.push('/login');
   };
 
