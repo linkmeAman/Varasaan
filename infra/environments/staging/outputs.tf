@@ -1,6 +1,6 @@
 output "github_environment_vars" {
   description = "Map these outputs to GitHub Environment variables for staging workflows."
-  value       = {
+  value = {
     STAGING_ECR_REPOSITORY             = module.platform.ecr_repository_name
     STAGING_ECS_CLUSTER                = module.platform.ecs_cluster_name
     STAGING_ECS_SERVICE                = module.platform.ecs_service_name
@@ -19,7 +19,7 @@ output "github_environment_vars" {
 
 output "github_environment_secrets" {
   description = "Map these outputs to GitHub Environment secrets for staging workflows."
-  value       = {
+  value = {
     AWS_STAGING_ROLE_ARN = module.platform.github_actions_role_arn
   }
   sensitive = true
