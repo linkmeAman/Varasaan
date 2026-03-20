@@ -1,11 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { Activity, AlertTriangle, CalendarClock, RefreshCw } from 'lucide-react';
 
 import { Button } from '../../../components/ui/Button';
-import { apiClient, type HeartbeatResponse } from '../../../lib/api-client';
-import { useAuth } from '../../../lib/auth-context';
+import { useHeartbeatWorkspace } from '../../../lib/use-heartbeat-workspace';
 
 function formatDate(value: string | null | undefined): string {
   if (!value) {
@@ -19,86 +17,8 @@ function formatDate(value: string | null | undefined): string {
 }
 
 export function HeartbeatScreen() {
-  const { user } = useAuth();
-  const [heartbeat, setHeartbeat] = useState<HeartbeatResponse | null>(null);
-  const [cadence, setCadence] = useState<'monthly' | 'quarterly'>('monthly');
-  const [enabled, setEnabled] = useState(true);
-  const [feedback, setFeedback] = useState('');
-  const [error, setError] = useState('');
-  const [loadingAction, setLoadingAction] = useState('');
-
-  useEffect(() => {
-    if (!user) {
-      return;
-    }
-
-    let mounted = true;
-
-    const loadHeartbeat = async () => {
-      setLoadingAction('load');
-      try {
-        const currentHeartbeat = await apiClient.getHeartbeat();
-        if (!mounted) {
-          return;
-        }
-        setHeartbeat(currentHeartbeat);
-        if (currentHeartbeat.cadence) {
-          setCadence(currentHeartbeat.cadence);
-        }
-        setEnabled(currentHeartbeat.enabled || !currentHeartbeat.configured);
-      } catch {
-        if (mounted) {
-          setError('Unable to load heartbeat settings right now.');
-        }
-      } finally {
-        if (mounted) {
-          setLoadingAction('');
-        }
-      }
-    };
-
-    void loadHeartbeat();
-    return () => {
-      mounted = false;
-    };
-  }, [user]);
-
-  const handleSave = async () => {
-    setLoadingAction('save');
-    setFeedback('');
-    setError('');
-    try {
-      const updated = await apiClient.upsertHeartbeat({
-        body: {
-          cadence,
-          enabled,
-        },
-      });
-      setHeartbeat(updated);
-      setFeedback(enabled ? 'Heartbeat schedule saved.' : 'Heartbeat paused.');
-    } catch {
-      setError('Unable to save your heartbeat settings.');
-    } finally {
-      setLoadingAction('');
-    }
-  };
-
-  const handleCheckIn = async () => {
-    setLoadingAction('checkin');
-    setFeedback('');
-    setError('');
-    try {
-      const updated = await apiClient.checkInHeartbeat();
-      setHeartbeat(updated);
-      setCadence(updated.cadence || cadence);
-      setEnabled(updated.enabled);
-      setFeedback('Heartbeat check-in recorded.');
-    } catch {
-      setError('Unable to record your heartbeat check-in.');
-    } finally {
-      setLoadingAction('');
-    }
-  };
+  const { heartbeat, cadence, enabled, feedback, error, loadingAction, setCadence, setEnabled, saveHeartbeat, checkInHeartbeat } =
+    useHeartbeatWorkspace();
 
   return (
     <div className="inventory-manager animate-fade-in">
@@ -118,8 +38,8 @@ export function HeartbeatScreen() {
           </div>
         </div>
 
-        {feedback && <p className="inventory-feedback">{feedback}</p>}
-        {error && <p className="input-error-msg">{error}</p>}
+        {feedback ? <p className="inventory-feedback">{feedback}</p> : null}
+        {error ? <p className="input-error-msg">{error}</p> : null}
 
         <div className="heartbeat-grid">
           <div className="heartbeat-card glass-panel">
@@ -142,13 +62,13 @@ export function HeartbeatScreen() {
             </label>
 
             <div className="inventory-actions-row">
-              <Button type="button" onClick={handleSave} isLoading={loadingAction === 'save'}>
+              <Button type="button" onClick={() => void saveHeartbeat()} isLoading={loadingAction === 'save'}>
                 <CalendarClock size={16} /> Save cadence
               </Button>
               <Button
                 type="button"
                 variant="secondary"
-                onClick={handleCheckIn}
+                onClick={() => void checkInHeartbeat()}
                 disabled={!heartbeat?.configured || !enabled}
                 isLoading={loadingAction === 'checkin'}
               >
@@ -178,16 +98,15 @@ export function HeartbeatScreen() {
               </div>
             </div>
 
-            {(heartbeat?.recovery_contact_count ?? 0) === 0 && (
+            {(heartbeat?.recovery_contact_count ?? 0) === 0 ? (
               <div className="heartbeat-warning">
                 <AlertTriangle size={18} />
                 <p>Add at least one active recovery-assist trusted contact before relying on escalation.</p>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </section>
     </div>
   );
 }
-

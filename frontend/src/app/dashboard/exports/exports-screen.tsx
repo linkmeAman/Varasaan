@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, Download, KeyRound, PackagePlus, RefreshCw } from 'lucide-react';
+import { Download, KeyRound, PackagePlus, RefreshCw } from 'lucide-react';
 
-import { Button } from '../components/ui/Button';
-import { apiClient, type ExportJobResponse } from '../lib/api-client';
-import { useAuth } from '../lib/auth-context';
+import { Button } from '../../../components/ui/Button';
+import { apiClient, type ExportJobResponse } from '../../../lib/api-client';
+import { readApiErrorMessage } from '../../../lib/api-errors';
+import { useAuth } from '../../../lib/auth-context';
 
 const EXPORT_JOBS_STORAGE_KEY = 'varasaan.export.jobs';
 
@@ -31,22 +31,12 @@ function writeStoredExportJobIds(ids: string[]): void {
   if (typeof window === 'undefined') {
     return;
   }
+
   window.localStorage.setItem(EXPORT_JOBS_STORAGE_KEY, JSON.stringify(ids));
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  if (typeof error === 'object' && error !== null) {
-    const message = (error as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error?.message;
-    if (message) {
-      return message;
-    }
-  }
-  return fallback;
-}
-
-export default function Exports() {
-  const { isLoading: authLoading, user } = useAuth();
-
+export function ExportsScreen() {
+  const { user } = useAuth();
   const [jobs, setJobs] = useState<ExportJobResponse[]>([]);
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
@@ -72,28 +62,14 @@ export default function Exports() {
   };
 
   useEffect(() => {
-    if (authLoading || !user) {
+    if (!user) {
       return;
     }
 
-    let mounted = true;
-
-    const load = async () => {
-      try {
-        await refreshJobs();
-      } catch {
-        if (mounted) {
-          setError('Unable to load export jobs.');
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      mounted = false;
-    };
-  }, [authLoading, user]);
+    void refreshJobs().catch((refreshError) => {
+      setError(readApiErrorMessage(refreshError, 'Unable to load export jobs.'));
+    });
+  }, [user]);
 
   useEffect(() => {
     if (!hasInFlightJobs) {
@@ -119,11 +95,10 @@ export default function Exports() {
       const existing = readStoredExportJobIds();
       const nextIds = [created.id, ...existing.filter((item) => item !== created.id)];
       writeStoredExportJobIds(nextIds);
-
       setJobs((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setFeedback('Export job queued.');
     } catch (createError) {
-      setError(errorMessage(createError, 'Unable to create export job.'));
+      setError(readApiErrorMessage(createError, 'Unable to create export job.'));
     } finally {
       setLoadingAction('');
     }
@@ -138,7 +113,7 @@ export default function Exports() {
       const response = await apiClient.ownerExportDownload({ exportJobId: jobId });
       window.open(response.download_url, '_blank', 'noopener,noreferrer');
     } catch (downloadError) {
-      setError(errorMessage(downloadError, 'Unable to generate owner download URL.'));
+      setError(readApiErrorMessage(downloadError, 'Unable to generate owner download URL.'));
     } finally {
       setLoadingAction('');
     }
@@ -158,32 +133,24 @@ export default function Exports() {
       window.open(download.download_url, '_blank', 'noopener,noreferrer');
       setFeedback(`One-time token used: ${token.one_time_token}`);
     } catch (downloadError) {
-      setError(errorMessage(downloadError, 'Unable to complete tokenized download.'));
+      setError(readApiErrorMessage(downloadError, 'Unable to complete tokenized download.'));
     } finally {
       setLoadingAction('');
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="inventory-manager animate-fade-in">
-        <p className="inventory-empty">Loading exports workspace...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="inventory-manager animate-fade-in">
       <div className="inventory-manager-header">
-        <Link href="/dashboard" className="inventory-back-link">
-          <ArrowLeft size={16} /> Back to dashboard
-        </Link>
-        <h1 className="dash-title">Exports</h1>
-        <p className="dash-subtitle">Create exports and download bundles securely.</p>
+        <div>
+          <p className="item-badge">Exports</p>
+          <h2 className="dash-title">Exports</h2>
+          <p className="dash-subtitle">Create exports and download bundles securely.</p>
+        </div>
       </div>
 
-      {feedback && <p className="inventory-feedback">{feedback}</p>}
-      {error && <p className="input-error-msg">{error}</p>}
+      {feedback ? <p className="inventory-feedback">{feedback}</p> : null}
+      {error ? <p className="input-error-msg">{error}</p> : null}
 
       <section className="inventory-panel glass-panel">
         <div className="inventory-actions-row">
@@ -197,7 +164,7 @@ export default function Exports() {
       </section>
 
       <section className="inventory-panel glass-panel">
-        <h2 className="section-title">Recent Export Jobs</h2>
+        <h3 className="section-title">Recent Export Jobs</h3>
         {jobs.length === 0 ? (
           <p className="inventory-empty">No export jobs yet.</p>
         ) : (

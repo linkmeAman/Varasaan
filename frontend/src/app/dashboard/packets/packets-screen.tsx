@@ -1,13 +1,13 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, FileText, RefreshCw } from 'lucide-react';
+import { FileText, RefreshCw } from 'lucide-react';
 
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { apiClient, type PacketJobResponse } from '../lib/api-client';
-import { useAuth } from '../lib/auth-context';
+import { Button } from '../../../components/ui/Button';
+import { Input } from '../../../components/ui/Input';
+import { apiClient, type PacketJobResponse } from '../../../lib/api-client';
+import { readApiErrorMessage } from '../../../lib/api-errors';
+import { useAuth } from '../../../lib/auth-context';
 
 const PACKET_JOBS_STORAGE_KEY = 'varasaan.packet.jobs';
 
@@ -32,21 +32,12 @@ function writeStoredPacketJobIds(ids: string[]): void {
   if (typeof window === 'undefined') {
     return;
   }
+
   window.localStorage.setItem(PACKET_JOBS_STORAGE_KEY, JSON.stringify(ids));
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  if (typeof error === 'object' && error !== null) {
-    const message = (error as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error?.message;
-    if (message) {
-      return message;
-    }
-  }
-  return fallback;
-}
-
-export default function Packets() {
-  const { isLoading: authLoading, user } = useAuth();
+export function PacketsScreen() {
+  const { user } = useAuth();
   const [platform, setPlatform] = useState('gmail');
   const [jobs, setJobs] = useState<PacketJobResponse[]>([]);
   const [feedback, setFeedback] = useState('');
@@ -66,33 +57,18 @@ export default function Packets() {
     const succeeded = settled
       .filter((result): result is PromiseFulfilledResult<PacketJobResponse> => result.status === 'fulfilled')
       .map((result) => result.value);
-
     setJobs(succeeded);
   };
 
   useEffect(() => {
-    if (authLoading || !user) {
+    if (!user) {
       return;
     }
 
-    let mounted = true;
-
-    const load = async () => {
-      try {
-        await refreshJobs();
-      } catch {
-        if (mounted) {
-          setError('Unable to load packet jobs.');
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      mounted = false;
-    };
-  }, [authLoading, user]);
+    void refreshJobs().catch((refreshError) => {
+      setError(readApiErrorMessage(refreshError, 'Unable to load packet jobs.'));
+    });
+  }, [user]);
 
   useEffect(() => {
     if (!hasInFlightJobs) {
@@ -110,7 +86,6 @@ export default function Packets() {
 
   const handleCreate = async (event: FormEvent) => {
     event.preventDefault();
-
     setLoadingAction('create');
     setFeedback('');
     setError('');
@@ -125,47 +100,32 @@ export default function Packets() {
       const existing = readStoredPacketJobIds();
       const nextIds = [created.id, ...existing.filter((item) => item !== created.id)];
       writeStoredPacketJobIds(nextIds);
-
       setJobs((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setFeedback('Packet generation job queued.');
     } catch (createError) {
-      setError(errorMessage(createError, 'Unable to create packet job.'));
+      setError(readApiErrorMessage(createError, 'Unable to create packet job.'));
     } finally {
       setLoadingAction('');
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="inventory-manager animate-fade-in">
-        <p className="inventory-empty">Loading packet jobs...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="inventory-manager animate-fade-in">
       <div className="inventory-manager-header">
-        <Link href="/dashboard" className="inventory-back-link">
-          <ArrowLeft size={16} /> Back to dashboard
-        </Link>
-        <h1 className="dash-title">Packet Jobs</h1>
-        <p className="dash-subtitle">Generate legal packet artifacts by platform.</p>
+        <div>
+          <p className="item-badge">Packets</p>
+          <h2 className="dash-title">Packet Jobs</h2>
+          <p className="dash-subtitle">Generate legal packet artifacts by platform.</p>
+        </div>
       </div>
 
-      {feedback && <p className="inventory-feedback">{feedback}</p>}
-      {error && <p className="input-error-msg">{error}</p>}
+      {feedback ? <p className="inventory-feedback">{feedback}</p> : null}
+      {error ? <p className="input-error-msg">{error}</p> : null}
 
       <section className="inventory-panel glass-panel">
-        <h2 className="section-title">Create Packet Job</h2>
+        <h3 className="section-title">Create Packet Job</h3>
         <form className="inventory-form" onSubmit={handleCreate}>
-          <Input
-            label="Platform"
-            value={platform}
-            onChange={(event) => setPlatform(event.target.value)}
-            placeholder="e.g. gmail"
-            required
-          />
+          <Input label="Platform" value={platform} onChange={(event) => setPlatform(event.target.value)} placeholder="e.g. gmail" required />
           <Button type="submit" isLoading={loadingAction === 'create'}>
             <FileText size={16} /> Queue Packet Job
           </Button>
@@ -174,7 +134,7 @@ export default function Packets() {
 
       <section className="inventory-panel glass-panel">
         <div className="inventory-actions-row">
-          <h2 className="section-title">Recent Packet Jobs</h2>
+          <h3 className="section-title">Recent Packet Jobs</h3>
           <Button type="button" variant="ghost" onClick={() => void refreshJobs()}>
             <RefreshCw size={16} /> Refresh
           </Button>
