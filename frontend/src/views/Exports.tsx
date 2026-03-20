@@ -6,7 +6,7 @@ import { ArrowLeft, Download, KeyRound, PackagePlus, RefreshCw } from 'lucide-re
 
 import { Button } from '../components/ui/Button';
 import { apiClient, type ExportJobResponse } from '../lib/api-client';
-import { useAuthGuard } from '../lib/use-auth-guard';
+import { useAuth } from '../lib/auth-context';
 
 const EXPORT_JOBS_STORAGE_KEY = 'varasaan.export.jobs';
 
@@ -45,7 +45,7 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 export default function Exports() {
-  const { isLoading: authLoading, user } = useAuthGuard();
+  const { isLoading: authLoading, user } = useAuth();
 
   const [jobs, setJobs] = useState<ExportJobResponse[]>([]);
   const [feedback, setFeedback] = useState('');

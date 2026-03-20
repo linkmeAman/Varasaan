@@ -1,9 +1,9 @@
 import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
 
+import { CSRF_HEADER_NAME } from './auth-cookies';
 import { getCsrfTokenFromCookie } from './session';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-const CSRF_HEADER_NAME = process.env.NEXT_PUBLIC_CSRF_HEADER_NAME || 'X-CSRF-Token';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -15,6 +15,7 @@ const api = axios.create({
 
 type RetryRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
+  _csrfRetry?: boolean;
 };
 
 const NO_REFRESH_AUTH_PATHS = [
@@ -60,9 +61,19 @@ function navigateToLogin() {
   }
 }
 
-async function ensureCsrfToken(): Promise<string | null> {
+function readApiErrorMessage(error: unknown): string {
+  if (typeof error === 'object' && error !== null) {
+    const detail = (error as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error?.message;
+    if (typeof detail === 'string') {
+      return detail;
+    }
+  }
+  return '';
+}
+
+async function ensureCsrfToken(forceRefresh = false): Promise<string | null> {
   const existing = getCsrfTokenFromCookie();
-  if (existing) {
+  if (!forceRefresh && existing) {
     return existing;
   }
 
@@ -113,6 +124,26 @@ api.interceptors.response.use(
     const requestUrl = originalRequest.url ?? '';
     const skipRefresh = matchesPath(requestUrl, NO_REFRESH_AUTH_PATHS);
     const suppressRedirect = matchesPath(requestUrl, NO_REDIRECT_AUTH_PATHS);
+    const errorMessage = readApiErrorMessage(error).toLowerCase();
+
+    if (
+      status === 403 &&
+      isMutatingMethod(originalRequest.method) &&
+      !requestUrl.includes('/api/v1/auth/csrf') &&
+      !originalRequest._csrfRetry &&
+      errorMessage.includes('csrf')
+    ) {
+      originalRequest._csrfRetry = true;
+      const refreshedCsrfToken = await ensureCsrfToken(true);
+      if (!refreshedCsrfToken) {
+        return Promise.reject(error);
+      }
+
+      const headers = AxiosHeaders.from(originalRequest.headers ?? {});
+      headers.set(CSRF_HEADER_NAME, refreshedCsrfToken);
+      originalRequest.headers = headers;
+      return api.request(originalRequest);
+    }
 
     if (status !== 401) {
       return Promise.reject(error);

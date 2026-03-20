@@ -7,7 +7,7 @@ import { ArrowLeft, FileText, RefreshCw } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { apiClient, type PacketJobResponse } from '../lib/api-client';
-import { useAuthGuard } from '../lib/use-auth-guard';
+import { useAuth } from '../lib/auth-context';
 
 const PACKET_JOBS_STORAGE_KEY = 'varasaan.packet.jobs';
 
@@ -46,7 +46,7 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 export default function Packets() {
-  const { isLoading: authLoading, user } = useAuthGuard();
+  const { isLoading: authLoading, user } = useAuth();
   const [platform, setPlatform] = useState('gmail');
   const [jobs, setJobs] = useState<PacketJobResponse[]>([]);
   const [feedback, setFeedback] = useState('');

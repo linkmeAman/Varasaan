@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter, Outfit } from 'next/font/google';
 import type { ReactNode } from 'react';
 import Navbar from '../components/layout/Navbar';
+import { AuthProvider } from '../lib/auth-context';
 import './globals.css';
 
 const inter = Inter({
@@ -29,10 +30,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${outfit.variable}`}>
-        <div className="app-container">
-          <Navbar />
-          <main className="main-content">{children}</main>
-        </div>
+        <AuthProvider>
+          <div className="app-container">
+            <Navbar />
+            <main className="main-content">{children}</main>
+          </div>
+        </AuthProvider>
       </body>
     </html>
   );
