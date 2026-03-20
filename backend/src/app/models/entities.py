@@ -89,6 +89,18 @@ class RecoveryRequestStatus(StrEnum):
     EXPIRED = "expired"
 
 
+class HeartbeatCadence(StrEnum):
+    MONTHLY = "monthly"
+    QUARTERLY = "quarterly"
+
+
+class HeartbeatStatus(StrEnum):
+    ACTIVE = "active"
+    PAUSED = "paused"
+    OVERDUE = "overdue"
+    ESCALATED = "escalated"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -162,6 +174,25 @@ class TrustedContact(Base):
     status: Mapped[TrustedContactStatus] = mapped_column(Enum(TrustedContactStatus), default=TrustedContactStatus.PENDING)
     recovery_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Heartbeat(Base):
+    __tablename__ = "heartbeats"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_heartbeats_user_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True)
+    cadence: Mapped[HeartbeatCadence] = mapped_column(Enum(HeartbeatCadence), nullable=False)
+    status: Mapped[HeartbeatStatus] = mapped_column(Enum(HeartbeatStatus), default=HeartbeatStatus.ACTIVE, index=True)
+    last_checked_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_expected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_action_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    pre_due_notice_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    escalation_level: Mapped[int] = mapped_column(Integer, default=0)
+    last_reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    executor_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
 class InviteToken(Base):

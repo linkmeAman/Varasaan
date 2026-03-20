@@ -24,6 +24,8 @@ export type RecoveryRequestResponse = { message: string; recovery_token?: string
 export type RecoveryAssistResponse = { message: string; };
 export type CsrfTokenResponse = { csrf_token: string; };
 export type UserSessionResponse = { id: string; email: string; email_verified: boolean; };
+export type HeartbeatUpsertRequest = { cadence: "monthly" | "quarterly"; enabled: boolean; };
+export type HeartbeatResponse = { configured: boolean; enabled: boolean; cadence?: "monthly" | "quarterly" | null; status: "unconfigured" | "active" | "paused" | "overdue" | "escalated"; last_checked_in_at?: string | null; next_expected_at?: string | null; next_action_at?: string | null; escalation_level: number; executor_notified_at?: string | null; recovery_contact_count: number; };
 export type TokenPair = { access_token: string; access_token_expires_at: string; refresh_token: string; refresh_token_expires_at: string; };
 export type UploadInitRequest = { doc_type: string; size_bytes: number; content_type?: string; sha256?: string | null; };
 export type UploadInitResponse = { document_id: string; version_id: string; version_no: number; object_key: string; upload_url: string; upload_url_expires_in_seconds: number; plaintext_dek_b64: string; kms_key_id: string; };
@@ -148,6 +150,10 @@ export interface TokenExportDownloadArgs {
 
 export interface IssueExportTokenArgs {
   exportJobId: string;
+}
+
+export interface UpsertHeartbeatArgs {
+  body: HeartbeatUpsertRequest;
 }
 
 export interface CreateInventoryAccountArgs {
@@ -450,6 +456,31 @@ export class VarasaanApiClient {
       ...config,
       method: "POST",
       url: `/api/v1/exports/${encodeURIComponent(String(args.exportJobId))}/token`,
+    });
+  }
+
+  public async getHeartbeat(config: AxiosRequestConfig = {}): Promise<HeartbeatResponse> {
+    return this.request<HeartbeatResponse>({
+      ...config,
+      method: "GET",
+      url: `/api/v1/heartbeats/me`,
+    });
+  }
+
+  public async upsertHeartbeat(args: UpsertHeartbeatArgs, config: AxiosRequestConfig = {}): Promise<HeartbeatResponse> {
+    return this.request<HeartbeatResponse>({
+      ...config,
+      method: "PUT",
+      url: `/api/v1/heartbeats/me`,
+      data: args.body,
+    });
+  }
+
+  public async checkInHeartbeat(config: AxiosRequestConfig = {}): Promise<HeartbeatResponse> {
+    return this.request<HeartbeatResponse>({
+      ...config,
+      method: "POST",
+      url: `/api/v1/heartbeats/me/check-in`,
     });
   }
 
