@@ -1,114 +1,118 @@
-# 🏗️ Industry-Standard Execution Blueprint: Phase 1 & 2
+# Phase 1 Execution Plan Sync
 
-This document provides a senior-engineering level architectural breakdown and step-by-step implementation guide for the remaining tasks defined in `PROGRESS_CHECKLIST.md`. It adheres to modern enterprise standards for Next.js 15 (App Router), React 19, and scalable Python/FastAPI architectures.
+This document is the reality-based execution view for the remaining Phase 1 work. It is aligned to the current repository state rather than the earlier greenfield assumptions.
 
----
-
-## 🏗️ Architectural Guiding Principles (Frontend)
-
-To ensure this application meets "industry scale" and compliance (DPDP/SOC2 readiness), the following paradigms **must** be followed for all remaining UI work:
-
-1. **RSC (React Server Components) First**: Default all components in `src/app` to Server Components to reduce the JavaScript bundle size and improve LCP (Largest Contentful Paint). Only use `'use client'` at the lowest possible leaf node (e.g., specific interactive forms, buttons).
-2. **Strict Type Safety**: Use the generated OpenAPI types (`frontend/src/api/openapi-types.ts`) for all API requests and component props. No `any` types.
-3. **Data Fetching & Caching**: Use Next.js native `fetch` with granular `revalidate` tags for public data. For authenticated user data, manage state using React Context combined with SWR or React Query to handle background refetching and stale-while-revalidate logic.
-4. **Secure State Management**: The session token MUST remain in HTTP-only cookies. The frontend UI should only hold a non-sensitive `User` object context, never the raw JWT.
-5. **Resilience & UX**: Every API call must be wrapped in generic error handlers. Use global `<ErrorBoundary>` and `Suspense` boundaries with skeletal loaders to prevent layout shift (CLS).
+Sync sources: status below is derived from the current frontend routes, legacy view layer, backend API surface, generated client artifacts, Playwright coverage, and CI workflows.
 
 ---
 
-## 🛠️ Step 1: Secure Authentication & Session Layer
+## 1. Current Shipped State
 
-**Objective**: Connect the Next.js UI to the finalized `/api/v1/auth/*` endpoints using industry-standard CSRF and Session patterns.
+### Done: Backend and contract surface
 
-- [ ] **1.1 Axios Interceptor Setup** (`frontend/src/lib/api-client.ts`)
-  - Implement an Axios instance that globally intercepts 401 Unauthorized errors and attempts to call `POST /api/v1/auth/refresh`.
-  - On a 403 CSRF Failure, automatically re-fetch the CSRF token from `GET /api/v1/auth/csrf` and retry the original request.
-- [ ] **1.2 Global Auth Provider** (`frontend/src/lib/auth-context.tsx`)
-  - Create a React Context (`AuthContext`) that fetches `GET /api/v1/auth/me` on mount.
-  - Implement a `useAuth` custom hook returning `{ user, isLoading, error, login, logout }`.
-- [ ] **1.3 Edge Route Protection** (`frontend/src/middleware.ts`)
-  - Implement Next.js Middleware to protect `/dashboard/*` routes. If the session cookie is missing, perform a 302 redirect to `/login` before rendering occurs.
-- [ ] **1.4 Login & Registration UI** (`src/app/login/`, `src/app/register/`)
-  - Build accessible forms using `react-hook-form` and `zod` for strict client-side validation.
-  - Ensure password inputs meet minimum entropy guidelines visually (Password strength meter).
-  - Submit using the `useAuth` hook. On success, use `router.push('/dashboard')` with `router.refresh()` to hydrate server components.
+- Auth, onboarding, password reset, assisted recovery, inventory, trusted contacts, documents, packets, exports, and payments are implemented in `backend/src/app/api`.
+- Generated client artifacts already exist in `frontend/src/api/openapi-types.ts` and `frontend/src/lib/generated/api-client.ts`.
+- CI already enforces `contract-sync`, `backend-quality`, `frontend-quality`, `infra-validate`, and `critical-path-e2e`.
 
----
+### Done: Frontend MVP routes and screens
 
-## 📊 Step 2: The Core Dashboard & Inventory Engine
+- App Router routes already exist for `/login`, `/register`, `/recovery`, `/dashboard`, `/dashboard/inventory`, `/dashboard/trusted-contacts`, `/dashboard/documents`, `/dashboard/packets`, `/dashboard/exports`, and `/dashboard/billing`.
+- Those routes currently mount client-heavy screen implementations from `frontend/src/views`.
+- Auth/session behavior already has a working MVP layer in `frontend/src/lib/api.ts` and `frontend/src/lib/use-auth-guard.ts`.
 
-**Objective**: Build a highly performant, accessible grid for users to input their digital legacy inventory.
+### Done: End-to-end MVP coverage
 
-- [ ] **2.1 Dashboard Shell Architecture** (`src/app/dashboard/layout.tsx`)
-  - Build a responsive App Shell with a collapsing sidebar (use `lucide-react` for iconography).
-  - Implement Breadcrumb navigation dynamically based on the current route.
-- [ ] **2.2 Optimistic UI for Inventory Grid** (`src/app/dashboard/page.tsx`)
-  - Fetch `GET /api/v1/inventory/accounts`. Render skeletal loaders while fetching.
-  - Render Accounts using a reusable `<AccountCard />` component.
-  - **Performance**: Implement "Virtualization" (e.g., `@tanstack/react-virtual`) if the account list grows beyond 100 items to maintain 60FPS scrolling.
-- [ ] **2.3 Create Account Modal** (`src/components/ui/AccountModal.tsx`)
-  - Create an accessible Dialog (`radix-ui/react-dialog` or Headless UI).
-  - Form matching `InventoryCreateRequest` (Platform, credentials hint, notes, priority).
-  - **UX**: Use optimistic updates. When the user hits "Save", instantly add the item to the UI state while the remote `POST /api/v1/inventory/accounts` request resolves in the background. Rollback on failure.
+- Existing Playwright coverage already exercises auth, recovery, inventory, trusted contacts, documents, packets, exports, and billing flows under `frontend/tests/e2e`.
+- The current Phase 1 gap is not "no UI"; it is "UI shipped in MVP form and needs architectural hardening."
+
+### Not done: Heartbeat
+
+- There is no dedicated heartbeat model, route surface, OpenAPI contract, worker orchestration, or frontend heartbeat UI.
+- Existing `last_heartbeat` usage in packet jobs is unrelated to the Phase 1 dead-man switch feature.
 
 ---
 
-## 🔐 Step 3: High-Security Document & Contacts UI
+## 2. Remaining Architecture Refactor Work
 
-**Objective**: Safely upload sensitive documents (death certificates) and securely invite executors.
+### Refactor/Harden: Route and layout ownership
 
-- [ ] **3.1 Trusted Contacts Management** (`src/app/dashboard/contacts/page.tsx`)
-  - Fetch `GET /api/v1/trusted-contacts`.
-  - Handle state transitions gracefully: Invite Sent (Pending) → Accepted (Active).
-  - Add a "Revoke Access" dangerous action with a secure confirmation dialog (typing the person's name to confirm).
-- [ ] **3.2 Multipart Document Upload Pipeline** (`src/components/ui/DocumentUploader.tsx`)
-  - Must use a multi-stage upload to prevent backend memory exhaustion:
-    1. Call `POST /api/v1/documents/uploads/init` to get a short-lived presigned URL.
-    2. Upload the `File` object via `fetch` directly to the S3/GCS presigned URL, tracking progress (`xhr.upload.onprogress`) for a UI progress bar.
-    3. Call `POST /api/v1/documents/versions/{versionId}/scan` to notify the backend the upload succeeded and queue an AV scan.
+- Add `frontend/src/app/dashboard/layout.tsx` to own the dashboard shell instead of spreading workspace concerns across individual pages and the global navbar.
+- Add `frontend/src/middleware.ts` for pre-render cookie checks on protected dashboard routes.
+- Replace the current thin page wrappers that only import `frontend/src/views/*` with route-owned App Router modules and smaller client leaves.
 
----
+### Refactor/Harden: Auth and session layer
 
-## 💳 Step 4: Monetization Integration (Razorpay)
+- Replace the standalone `useAuthGuard` pattern with a shared auth provider and `useAuth` hook that owns `GET /api/v1/auth/me`, login, logout, and session refresh behavior.
+- Keep session credentials in HTTP-only cookies only; client state should hold the non-sensitive current user object.
+- Keep the existing Axios/generated-client integration, but treat it as the transport layer under the new auth provider rather than the final architecture.
 
-**Objective**: Implement a frictionless checkout flow with bulletproof verification.
+### Refactor/Harden: Workspace behavior and UX
 
-- [ ] **4.1 Resilient Checkout Flow** (`src/app/dashboard/checkout/page.tsx`)
-  - Fetch `POST /api/v1/payments/checkout` to generate the `order_id`.
-  - Inject the Razorpay Web SDK asynchronously.
-  - On payment success, **DO NOT trust the client callback alone**. Render a "Verifying..." animation while polling `GET /api/v1/payments/{orderId}` every 2 seconds until the backend webhook updates the order status to `SUCCESS`.
+- Move inventory, trusted contacts, documents, billing, packets, and exports toward server-first route ownership with clearer loading and error boundaries.
+- Upgrade inventory mutations to a more explicit optimistic-update flow and isolate list/card components from form state.
+- Replace the current billing manual refresh pattern with a verification state that polls payment status after checkout success.
+- Replace the current document upload flow with a reusable uploader that shows direct-upload progress before scan dispatch.
+- Add proper dashboard-level loading and error handling instead of relying only on per-view client guards.
 
----
+### Refactor/Harden: Verification baseline
 
-## ⚙️ Step 5: Distributed Heartbeat System (Backend)
-
-**Objective**: Build a fault-tolerant, scalable Dead-Man Switch that guarantees exactly-once execution.
-
-- [ ] **5.1 Database Implementation** (`backend/app/models/heartbeat.py`)
-  - Table schemas must use strict indexing on `next_expected` timestamp to optimize background polling.
-- [ ] **5.2 Celery Beat Producer** (`backend/app/workers/heartbeat_scheduler.py`)
-  - Create a cron-driven Celery task running every 5 minutes.
-  - Query: `SELECT id FROM heartbeats WHERE next_expected < NOW() AND status = 'ACTIVE'`.
-- [ ] **5.3 Idempotent Consumer Tasks** (`backend/app/workers/heartbeat_tasks.py`)
-  - Use `SELECT FOR UPDATE SKIP LOCKED` (Row-level locking) when picking up a heartbeat to process. This prevents two concurrent workers from sending duplicate warning emails to the same user.
-  - If escalation reaches maximum, dispatch an event to the API to trigger `Phase 2: After-Loss Mode`.
-  - Log every transition immutably to the `audit_logs` table for compliance.
+- Re-run frontend lint, typecheck, backend pytest, and Playwright only after local dependencies are installed.
+- Do not mark the refactor work complete until local and CI quality gates agree.
 
 ---
 
-## 🧪 Step 6: Automated Quality Gates (E2E)
+## 3. Heartbeat Implementation Scope
 
-**Objective**: Ensure regressions are impossible before merging to `main`.
+### Build New: Backend domain and API
 
-- [ ] **6.1 Playwright Smoke Tests** (`frontend/tests/e2e/critical-path.spec.ts`)
-  - **Test 1**: User Signup -> Email Verification (mocked) -> Login -> Session preserved across reload.
-  - **Test 2**: Create Account in Inventory -> Assert it displays -> Reload page -> Assert it still displays.
-  - **Mocking**: For external services (Razorpay, AWS S3), utilize Playwright's `page.route` to mock network responses to make the CI pipeline deterministic and fast.
+- Add a dedicated heartbeat persistence model and migration for the user dead-man switch state.
+- Add Phase 1 heartbeat endpoints for:
+  - retrieving the current user's heartbeat configuration,
+  - creating or updating cadence and enabled state,
+  - performing an explicit user check-in.
+- Regenerate OpenAPI and frontend client/types after the route surface is added.
+
+### Build New: Scheduler and worker flow
+
+- Add a heartbeat scheduler task that runs every 5 minutes and selects due heartbeat records for processing.
+- Add an idempotent worker flow that locks candidate rows safely before sending reminders or escalating state.
+- Log heartbeat state changes into `audit_logs`.
+- Keep Phase 1 behavior limited to reminder and executor notification; do not trigger full After-Loss Mode automatically.
+
+### Build New: Basic frontend slice
+
+- Add a basic dashboard heartbeat surface where the user can:
+  - choose cadence,
+  - see next expected check-in,
+  - see current reminder/escalation state,
+  - perform a manual check-in.
+- Keep this UI intentionally small for Phase 1; the target is usable configuration, not a full after-loss workflow.
 
 ---
 
-### Definition of Done for these Tasks
-1. **0 Errors via `npm run typecheck`** (Strict TypeScript).
-2. **0 Warnings via `npm run lint`** (ESLint / Ruff).
-3. **Accessibility passed**: Lighthouse score of 100 for Accessibility.
-4. **Tested**: PRs include Playwright tests for new components.
+## 4. Verification and Release Gates
+
+### Repo truth checks for docs and implementation status
+
+- `git diff -- EXECUTION_PLAN.md PROGRESS_CHECKLIST.md`
+- `rg -n "dashboard/layout|middleware|heartbeat" frontend/src backend/src`
+- `rg -n "critical-path-e2e|frontend-quality|backend-quality|contract-sync" .github/workflows`
+
+### Quality gates that must stay authoritative
+
+- Frontend: `npm run lint`, `npm run typecheck`, `npm run test:smoke`, `npm run build`
+- Backend: Ruff, mypy, and `pytest`
+- End to end: `critical-path-e2e`
+
+### Current local verification constraint
+
+- Local verification in this workspace is presently incomplete because dependency bootstrap has not been finished:
+  - `frontend/node_modules` is absent, so frontend lint/typecheck cannot yet be treated as current truth.
+  - backend pytest currently fails at setup in this environment because `aiosqlite` is missing.
+- Until bootstrap is completed and checks are rerun, "done" applies only to observed repository state and existing checked-in coverage, not to fresh local execution.
+
+### Release discipline
+
+- Land Phase 1 docs sync and future implementation work through review branches and PRs.
+- Keep PR titles and commit headers Conventional Commit compliant so they pass the existing CI policy.
+- Do not broaden scope into Phase 2 work until the Phase 1 architecture hardening and heartbeat feature are both verified through the existing release gates.

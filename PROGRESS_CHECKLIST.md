@@ -1,62 +1,86 @@
-# 📊 Digital Legacy Manager — Progress & Next Steps Checklist
+# Digital Legacy Manager - Progress Checklist
 
-This document tracks the actual implementation progress against the `PRODUCT_DEVELOPMENT.md` roadmap. It serves as your daily dashboard for what has been completed and what to tackle next.
+This checklist tracks repository reality against the current product roadmap and execution documents.
 
----
-
-## 🟢 Phase 0 — Foundation (Completed)
-*Infrastructure, compliance, and basic backend setup are functionally complete based on the integration checklists.*
-
-- [x] **Project Setup**: Monorepo structure (`frontend`, `backend`, `packages`), tooling (`uv`, Ruff, pre-commit) configured.
-- [x] **CI/CD Pipeline**: GitHub workflows, required checks (`contract-sync`, `pr-title-lint`, `backend-quality`), and environments (`staging`, `prod`) are active.
-- [x] **Database Schema**: Core tables implemented and integrated.
-- [x] **Security Baseline**: JWT/Cookies flow, double-submit CSRF, OpenAPI contract sync established.
+Sync sources: status below is derived from the current frontend routes, backend API surface, generated client artifacts, Playwright coverage, and CI workflows.
 
 ---
 
-## 🟡 Phase 1 — MVP: Planning Mode (In Progress)
-*Backend APIs are heavily built and synced. The primary focus right now should be completing the Frontend UI and tying everything together.*
+## Phase 0 - Foundation
 
-### Backend / API (Mostly Complete)
-- [x] **Auth + Onboarding**: Signup, login, email verification, password reset APIs are synced.
-- [x] **Account Inventory Builder**: Accounts API endpoints are synced.
-- [x] **Trusted Contacts**: Invite, accept, list, and revoke APIs are synced.
-- [x] **Evidence Packet Generator**: Job creation and retrieval APIs (exports & packets) are synced.
-- [x] **Payment Integration**: Razorpay checkout and webhook APIs are synced.
-- [x] **Document Management**: Uploads init, grants, and scan queue APIs are synced.
-- [ ] **Heartbeat / Dead-Man Switch**: Cron jobs and related endpoints for the heartbeat ping and escalation reminders.
+Infrastructure, release governance, contract generation, and the base backend stack are in place.
 
-### Frontend / UI (Current Focus)
-- [ ] **Auth Flow Screens**: Login, Registration, Password Reset UI.
-- [ ] **Dashboard / Inventory Builder**: UI to add/manage 50+ platforms, fill credentials hints, etc.
-- [ ] **Trusted Contacts UI**: Screens to invite executors and setup relationships.
-- [ ] **Payment & Checkout UI**: Razorpay frontend integration for Essential/Executor tiers.
-- [ ] **Document Uploads UI**: Safe client-side UI to upload death certificates/evidence.
+- [x] Project setup: monorepo structure, root/frontend package manifests, backend Python project, and shared OpenAPI artifacts exist.
+- [x] CI/CD pipeline: GitHub workflows enforce `pr-title-lint`, `contract-sync`, `backend-quality`, `frontend-quality`, `infra-validate`, and `critical-path-e2e`.
+- [x] Database schema baseline: core entities, Alembic, and async SQLAlchemy wiring exist.
+- [x] Security baseline: cookie auth, CSRF enforcement, OpenAPI sync, and protected API dependencies exist.
 
 ---
 
-## 🔴 Phase 2 — After-Loss Mode (Pending)
-*This phase will be tackled once the MVP Planning Mode is fully usable by the person planning their estate.*
+## Phase 1 - MVP Planning Mode
 
-- [ ] **Case Activation Flow** (Executor dashboard activation, death certificate validation)
-- [ ] **Task Management / Kanban** (Auto-generating tasks from inventory)
-- [ ] **Evidence & Proof Capture** (Uploading completion states)
-- [ ] **Subscription Bleeding Stopper** (Cancellation checklists)
-- [ ] **Family Workspace** (Collaboration threads and assignment)
-- [ ] **Crypto Inheritance Kit** 
+The MVP is partially shipped. The remaining work is now architecture hardening plus the missing heartbeat feature.
+
+### Backend / API
+
+- [x] Auth and onboarding API: signup, login, email verification, password reset, logout, session refresh, and recovery flows are implemented.
+- [x] Inventory API: create, list, update, and delete account inventory endpoints are implemented.
+- [x] Trusted contacts API: create, invite, accept, list, and revoke endpoints are implemented.
+- [x] Documents API: upload init, scan dispatch, listing, grants, download, and soft delete are implemented.
+- [x] Evidence packet and export API: packet/export job creation and retrieval flows are implemented.
+- [x] Payments API: checkout, webhook processing, and payment status retrieval are implemented.
+- [ ] Heartbeat / dead-man switch: dedicated model, routes, generated contract surface, and worker flow are still missing.
+
+### Frontend / UI
+
+- [x] Auth screens: `/login`, `/register`, and `/recovery` are implemented as MVP flows.
+- [x] Dashboard and inventory UI: `/dashboard` and `/dashboard/inventory` are implemented as MVP routes.
+- [x] Trusted contacts UI: `/dashboard/trusted-contacts` is implemented as an MVP route.
+- [x] Document uploads UI: `/dashboard/documents` is implemented as an MVP route.
+- [x] Payment and checkout UI: `/dashboard/billing` is implemented as an MVP route.
+- [x] Evidence packet and export UI: `/dashboard/packets` and `/dashboard/exports` are implemented as MVP routes.
+
+### E2E / integration status
+
+- [x] Playwright auth flow coverage exists.
+- [x] Playwright recovery flow coverage exists.
+- [x] Playwright workspace coverage exists for inventory, trusted contacts, documents, packets, exports, and billing.
+
+### Current technical debt / hardening focus
+
+- [ ] Replace thin App Router page wrappers that only mount `frontend/src/views/*` with route-owned modules.
+- [ ] Add `frontend/src/app/dashboard/layout.tsx` and dashboard-level loading/error boundaries.
+- [ ] Add `frontend/src/middleware.ts` for protected-route cookie checks.
+- [ ] Replace the standalone auth guard pattern with a shared auth provider and hook.
+- [ ] Upgrade inventory, document upload, and billing flows from MVP behavior to hardened UX patterns.
+- [ ] Re-run local frontend/backend verification after dependency bootstrap so current status is backed by fresh execution, not only checked-in code.
 
 ---
 
-## 🔮 Phase 3 & 4 (Future Roadmap)
-- [ ] B2B APIs & White-labeling
-- [ ] React Native Mobile App
-- [ ] Analytics & Observability
-- [ ] AI-assisted letter drafting & Regional languages
+## Phase 2 - After-Loss Mode
+
+This phase remains pending and should not be started until Phase 1 architecture hardening and heartbeat are complete.
+
+- [ ] Case activation flow
+- [ ] Task management / Kanban
+- [ ] Evidence and proof capture
+- [ ] Subscription bleeding stopper
+- [ ] Family workspace
+- [ ] Crypto inheritance kit
 
 ---
 
-## 🚀 Immediate Next Steps (What to do today)
+## Phase 3 and 4 - Future Roadmap
 
-1. **Frontend UI Implementation**: Continue building the React/Next.js screens (`apps`, `views`, `components`) to consume the synced OpenAPIs for Auth, Inventory, and Trusted Contacts.
-2. **Heartbeat System Backend**: Implement the background job (Celery/Postgres) and endpoints for the heartbeat/dead-man switch mechanism.
-3. **End-to-End Testing**: Start tying the frontend directly to the staging backend testing Razorpay, Email flows, and PDF generation from the actual UI.
+- [ ] B2B APIs and white-labeling
+- [ ] React Native mobile app
+- [ ] Analytics and observability expansion
+- [ ] AI-assisted letter drafting and regional language support
+
+---
+
+## Immediate Next Steps
+
+1. Frontend architecture hardening: add dashboard layout/middleware/auth-provider structure and migrate route ownership away from the legacy `src/views` pattern.
+2. Heartbeat implementation: add the missing backend model, route surface, worker flow, generated types, and a basic dashboard UI.
+3. Verification parity: complete dependency bootstrap locally and rerun lint, typecheck, pytest, and Playwright so repository status is confirmed by fresh execution.
