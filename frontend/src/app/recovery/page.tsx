@@ -1,5 +1,5 @@
-import Recovery from '../../views/Recovery';
+import { RecoveryScreen } from './recovery-screen';
 
 export default function RecoveryPage() {
-  return <Recovery />;
+  return <RecoveryScreen />;
 }

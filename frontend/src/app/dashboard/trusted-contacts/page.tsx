@@ -1,5 +1,5 @@
-import TrustedContacts from '../../../views/TrustedContacts';
+import { TrustedContactsScreen } from './trusted-contacts-screen';
 
 export default function TrustedContactsPage() {
-  return <TrustedContacts />;
+  return <TrustedContactsScreen />;
 }

@@ -1,5 +1,5 @@
-import Exports from '../../../views/Exports';
+import { ExportsScreen } from './exports-screen';
 
 export default function ExportsPage() {
-  return <Exports />;
+  return <ExportsScreen />;
 }

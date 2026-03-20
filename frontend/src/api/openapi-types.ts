@@ -195,6 +195,104 @@ export const openApiDocument = {
         }
       }
     },
+    "/api/v1/heartbeats/me": {
+      "get": {
+        "tags": [
+          "heartbeats"
+        ],
+        "operationId": "getHeartbeat",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current heartbeat configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeartbeatResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "heartbeats"
+        ],
+        "operationId": "upsertHeartbeat",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeartbeatUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Heartbeat configuration saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeartbeatResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/heartbeats/me/check-in": {
+      "post": {
+        "tags": [
+          "heartbeats"
+        ],
+        "operationId": "checkInHeartbeat",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Heartbeat check-in recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeartbeatResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
     "/api/v1/auth/password-reset/confirm": {
       "post": {
         "tags": [
@@ -2030,6 +2128,87 @@ export const openApiDocument = {
           },
           "email_verified": {
             "type": "boolean"
+          }
+        }
+      },
+      "HeartbeatUpsertRequest": {
+        "type": "object",
+        "required": [
+          "cadence",
+          "enabled"
+        ],
+        "properties": {
+          "cadence": {
+            "type": "string",
+            "enum": [
+              "monthly",
+              "quarterly"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "HeartbeatResponse": {
+        "type": "object",
+        "required": [
+          "configured",
+          "enabled",
+          "status",
+          "escalation_level",
+          "recovery_contact_count"
+        ],
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "cadence": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "monthly",
+              "quarterly"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unconfigured",
+              "active",
+              "paused",
+              "overdue",
+              "escalated"
+            ]
+          },
+          "last_checked_in_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "next_expected_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "next_action_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "escalation_level": {
+            "type": "integer"
+          },
+          "executor_notified_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "recovery_contact_count": {
+            "type": "integer"
           }
         }
       },

@@ -1,11 +1,11 @@
 import { Suspense } from 'react';
 
-import Login from '../../views/Login';
+import { LoginScreen } from './login-screen';
 
 export default function LoginPage() {
   return (
     <Suspense fallback={null}>
-      <Login />
+      <LoginScreen />
     </Suspense>
   );
 }

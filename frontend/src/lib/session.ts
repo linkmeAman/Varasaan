@@ -1,4 +1,4 @@
-const DEFAULT_CSRF_COOKIE_NAME = process.env.NEXT_PUBLIC_CSRF_COOKIE_NAME || 'varasaan_csrf_token';
+import { CSRF_COOKIE_NAME } from './auth-cookies';
 
 function canUseDocument(): boolean {
   return typeof document !== 'undefined';
@@ -19,5 +19,5 @@ export function getCookieValue(name: string): string | null {
 }
 
 export function getCsrfTokenFromCookie(): string | null {
-  return getCookieValue(DEFAULT_CSRF_COOKIE_NAME);
+  return getCookieValue(CSRF_COOKIE_NAME);
 }
