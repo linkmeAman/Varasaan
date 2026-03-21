@@ -77,6 +77,24 @@ test('executor can activate a pending case and manage generated tasks', async ({
   await dialog.getByLabel('Notes').fill('Submitted through Dropbox support.');
   await dialog.getByRole('button', { name: /Save Task/i }).click();
   await expect(page.getByText('Task updated.')).toBeVisible();
+
+  await dialog.getByLabel('Evidence File').setInputFiles({
+    name: 'dropbox-proof-1.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.1\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n', 'utf-8'),
+  });
+  await dialog.getByRole('button', { name: /Upload Evidence/i }).click();
+  await expect(dialog.getByText('dropbox-proof-1.pdf')).toBeVisible();
+  await expect(dialog.getByText('Scan passed')).toBeVisible();
+
+  await dialog.getByLabel('Evidence File').setInputFiles({
+    name: 'dropbox-proof-2.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  });
+  await dialog.getByRole('button', { name: /Upload Evidence/i }).click();
+  await expect(dialog.getByText('dropbox-proof-2.png')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /Download/i })).toHaveCount(2);
   await dialog.getByRole('button', { name: /^Close$/ }).click();
 
   await page.locator('#case-filter-status').selectOption('submitted');
@@ -84,4 +102,23 @@ test('executor can activate a pending case and manage generated tasks', async ({
   await expect(page.locator('.executor-list-item')).toContainText('REF-EXEC-001');
   await expect(page.locator('.executor-list-item')).toContainText('Submitted: 2026-03-21');
   await expect(page.locator('.executor-list-item')).toContainText('Submitted through Dropbox support.');
+  await expect(page.locator('.executor-list-item')).toContainText('Evidence files: 2');
+
+  await page.getByRole('button', { name: /Closure Report/i }).click();
+  await expect(page).toHaveURL(/\/executor\/cases\/.+\/report/);
+  await expect(page.getByRole('heading', { name: /Closure Report/i })).toBeVisible();
+  await expect(page.getByText('Draft report')).toBeVisible();
+  await expect(page.getByText(/not yet resolved or escalated/i)).toBeVisible();
+  await expect(page.getByText(/do not have clean evidence/i)).toBeVisible();
+  await expect(page.getByText('dropbox-proof-1.pdf')).toBeVisible();
+  await expect(page.getByText('dropbox-proof-2.png')).toBeVisible();
+
+  await page.evaluate(() => {
+    (window as Window & { __printCalls?: number }).__printCalls = 0;
+    window.print = () => {
+      (window as Window & { __printCalls?: number }).__printCalls = ((window as Window & { __printCalls?: number }).__printCalls || 0) + 1;
+    };
+  });
+  await page.getByRole('button', { name: /Print \/ Save as PDF/i }).click();
+  await expect.poll(async () => page.evaluate(() => (window as Window & { __printCalls?: number }).__printCalls || 0)).toBe(1);
 });

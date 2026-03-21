@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, PencilLine, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Download, FileUp, PencilLine, Printer, RotateCcw } from 'lucide-react';
 
 import { Dialog } from '../../../../components/ui/Dialog';
 import { Button } from '../../../../components/ui/Button';
@@ -11,7 +11,9 @@ import { type CaseTaskResponse } from '../../../../lib/api-client';
 import {
   EXECUTOR_TASK_STATUSES,
   INITIAL_EXECUTOR_TASK_FILTERS,
+  formatExecutorTimestamp,
   getExecutorCaseLabel,
+  getExecutorEvidenceStatusLabel,
   getExecutorStatusLabel,
   type ExecutorTaskDraft,
   useExecutorCase,
@@ -35,46 +37,67 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
   const {
     caseSummary,
     tasks,
+    activity,
+    evidenceByTask,
     filters,
     isLoadingCase,
     isLoadingTasks,
+    isLoadingActivity,
     feedback,
     error,
     loadingAction,
+    uploadProgress,
     setFilters,
     updateTask,
+    refreshEvidence,
+    uploadTaskEvidence,
+    downloadTaskEvidence,
   } = useExecutorCase(caseId);
-  const [selectedTask, setSelectedTask] = useState<CaseTaskResponse | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ExecutorTaskDraft | null>(null);
+  const [selectedEvidenceFile, setSelectedEvidenceFile] = useState<File | null>(null);
+  const [evidenceInputKey, setEvidenceInputKey] = useState(0);
+
+  const selectedTask = selectedTaskId ? tasks.find((task) => task.id === selectedTaskId) || null : null;
+  const selectedTaskEvidence = selectedTask ? evidenceByTask[selectedTask.id] : undefined;
 
   const platformOptions = Array.from(new Set(tasks.map((task) => task.platform))).sort();
   const categoryOptions = Array.from(new Set(tasks.map((task) => task.category))).sort();
   const priorityOptions = Array.from(new Set(tasks.map((task) => String(task.priority)))).sort((left, right) => Number(right) - Number(left));
 
-  const filteredTasks = tasks.filter((task) => {
-    if (filters.status !== 'all' && task.status !== filters.status) {
-      return false;
-    }
-    if (filters.platform !== 'all' && task.platform !== filters.platform) {
-      return false;
-    }
-    if (filters.category !== 'all' && task.category !== filters.category) {
-      return false;
-    }
-    if (filters.priority !== 'all' && String(task.priority) !== filters.priority) {
-      return false;
-    }
-    return true;
-  });
+  const filteredTasks = useMemo(
+    () =>
+      tasks.filter((task) => {
+        if (filters.status !== 'all' && task.status !== filters.status) {
+          return false;
+        }
+        if (filters.platform !== 'all' && task.platform !== filters.platform) {
+          return false;
+        }
+        if (filters.category !== 'all' && task.category !== filters.category) {
+          return false;
+        }
+        if (filters.priority !== 'all' && String(task.priority) !== filters.priority) {
+          return false;
+        }
+        return true;
+      }),
+    [filters, tasks],
+  );
 
   const openTaskEditor = (task: CaseTaskResponse) => {
-    setSelectedTask(task);
+    setSelectedTaskId(task.id);
     setDraft(createTaskDraft(task));
+    setSelectedEvidenceFile(null);
+    setEvidenceInputKey((current) => current + 1);
+    void refreshEvidence(task.id);
   };
 
   const closeTaskEditor = () => {
-    setSelectedTask(null);
+    setSelectedTaskId(null);
     setDraft(null);
+    setSelectedEvidenceFile(null);
+    setEvidenceInputKey((current) => current + 1);
   };
 
   const handleSave = async () => {
@@ -84,8 +107,19 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
 
     const updatedTask = await updateTask(selectedTask.id, draft);
     if (updatedTask) {
-      setSelectedTask(updatedTask);
       setDraft(createTaskDraft(updatedTask));
+    }
+  };
+
+  const handleEvidenceUpload = async () => {
+    if (!selectedTask || !selectedEvidenceFile) {
+      return;
+    }
+
+    const uploaded = await uploadTaskEvidence(selectedTask.id, selectedEvidenceFile);
+    if (uploaded) {
+      setSelectedEvidenceFile(null);
+      setEvidenceInputKey((current) => current + 1);
     }
   };
 
@@ -142,6 +176,15 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
           <span>In progress: {caseSummary.task_status_counts.in_progress}</span>
           <span>Waiting: {caseSummary.task_status_counts.waiting}</span>
           <span>Resolved: {caseSummary.task_status_counts.resolved}</span>
+        </div>
+
+        <div className="executor-workspace-actions">
+          <Button type="button" variant="ghost" onClick={() => router.push('/executor')}>
+            <ArrowLeft size={16} /> Back to Cases
+          </Button>
+          <Button type="button" variant="secondary" onClick={() => router.push(`/executor/cases/${caseId}/report`)}>
+            <Printer size={16} /> Closure Report
+          </Button>
         </div>
       </header>
 
@@ -215,6 +258,86 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
                 onChange={(event) => setDraft((current) => (current ? { ...current, notes: event.target.value } : current))}
               />
             </div>
+
+            <section className="executor-evidence-section">
+              <div className="executor-section-header">
+                <div>
+                  <p className="item-badge">Evidence</p>
+                  <h3 className="section-title">Proof Files</h3>
+                  <p className="dash-subtitle">Upload PDFs, PNGs, or JPEGs. Each file is scanned before it can appear in the closure report.</p>
+                </div>
+              </div>
+
+              <div className="executor-evidence-upload">
+                <div className="input-wrapper">
+                  <label className="input-label" htmlFor="task-evidence-file">
+                    Evidence File
+                  </label>
+                  <input
+                    key={evidenceInputKey}
+                    id="task-evidence-file"
+                    className="input-field"
+                    type="file"
+                    accept="application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg"
+                    onChange={(event) => setSelectedEvidenceFile(event.target.files?.[0] ?? null)}
+                  />
+                </div>
+
+                {loadingAction === `evidence-upload-${selectedTask.id}` ? (
+                  <div className="upload-progress">
+                    <div className="upload-progress-bar">
+                      <span style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                    <p className="input-helper-msg">Uploading {uploadProgress}%</p>
+                  </div>
+                ) : null}
+
+                <Button
+                  type="button"
+                  onClick={() => void handleEvidenceUpload()}
+                  isLoading={loadingAction === `evidence-upload-${selectedTask.id}`}
+                  disabled={!selectedEvidenceFile}
+                >
+                  <FileUp size={16} /> Upload Evidence
+                </Button>
+              </div>
+
+              {selectedTaskEvidence === undefined ? (
+                <p className="inventory-empty">Loading task evidence...</p>
+              ) : selectedTaskEvidence.length === 0 ? (
+                <p className="inventory-empty">No evidence uploaded for this task yet.</p>
+              ) : (
+                <div className="executor-evidence-list">
+                  {selectedTaskEvidence.map((evidence) => (
+                    <div key={evidence.id} className="executor-evidence-item glass-panel">
+                      <div className="item-meta">
+                        <div className="executor-evidence-item-header">
+                          <strong>{evidence.file_name}</strong>
+                          <span className={`status-indicator ${evidence.scan_status === 'clean' ? 'success' : 'warning'}`}>
+                            {getExecutorEvidenceStatusLabel(evidence)}
+                          </span>
+                        </div>
+                        <p className="item-secondary">{evidence.content_type}</p>
+                        <p className="item-secondary">Uploaded: {formatExecutorTimestamp(evidence.created_at)}</p>
+                        {evidence.scan_summary ? <p className="item-secondary">{evidence.scan_summary}</p> : null}
+                      </div>
+                      <div className="inventory-item-actions">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => void downloadTaskEvidence(selectedTask.id, evidence.id)}
+                          disabled={!evidence.download_available}
+                          isLoading={loadingAction === `evidence-download-${evidence.id}`}
+                        >
+                          <Download size={14} /> Download
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
 
             <div className="inventory-actions-row">
               <Button type="button" onClick={() => void handleSave()} isLoading={loadingAction === `task-${selectedTask.id}`}>
@@ -355,6 +478,7 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
                             <span>Priority {task.priority}</span>
                           </div>
                           <p>{task.category}</p>
+                          <span className="item-secondary">Evidence: {task.evidence_count}</span>
                           {task.reference_number ? <span className="item-secondary">Ref: {task.reference_number}</span> : null}
                         </button>
                       ))
@@ -363,6 +487,34 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
                 </div>
               );
             })}
+          </div>
+        )}
+      </section>
+
+      <section className="inventory-panel glass-panel executor-section">
+        <div className="executor-section-header">
+          <div>
+            <p className="item-badge">Activity</p>
+            <h2 className="section-title">Case Timeline</h2>
+            <p className="dash-subtitle">Uploads, scan completions, task updates, and report views appear here.</p>
+          </div>
+        </div>
+
+        {isLoadingActivity ? (
+          <p className="inventory-empty">Loading case activity...</p>
+        ) : activity.length === 0 ? (
+          <p className="inventory-empty">No case activity recorded yet.</p>
+        ) : (
+          <div className="executor-activity-list">
+            {activity.map((event) => (
+              <div key={`${event.timestamp}-${event.event_type}-${event.evidence_id || event.task_id || 'case'}`} className="executor-activity-item">
+                <div className="executor-activity-item-header">
+                  <strong>{event.message}</strong>
+                  <span>{formatExecutorTimestamp(event.timestamp)}</span>
+                </div>
+                <p className="item-secondary">{event.actor_label}</p>
+              </div>
+            ))}
           </div>
         )}
       </section>
@@ -389,6 +541,7 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
                   <p className="item-secondary">
                     {getExecutorStatusLabel(task.status)} • Priority {task.priority}
                   </p>
+                  <p className="item-secondary">Evidence files: {task.evidence_count}</p>
                   {task.reference_number ? <p className="item-secondary">Reference: {task.reference_number}</p> : null}
                   {task.submitted_date ? <p className="item-secondary">Submitted: {task.submitted_date}</p> : null}
                   {task.notes ? <p className="item-secondary">{task.notes}</p> : null}

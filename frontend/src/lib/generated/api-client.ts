@@ -51,8 +51,16 @@ export type CaseSummaryResponse = { id: string; owner_user_id: string; owner_nam
 export type CaseActivationUploadInitRequest = { size_bytes: number; content_type: "application/pdf"; sha256?: string | null; };
 export type CaseActivationUploadInitResponse = { document_id: string; version_id: string; version_no: number; object_key: string; upload_url: string; upload_url_expires_in_seconds: number; plaintext_dek_b64: string; kms_key_id: string; doc_type: "death_certificate"; };
 export type CaseActivationConfirmRequest = { document_id: string; version_id: string; };
-export type CaseTaskResponse = { id: string; case_id: string; inventory_account_id?: string | null; platform: string; category: string; priority: number; status: CaseTaskStatus; notes?: string | null; reference_number?: string | null; submitted_date?: string | null; evidence_document_id?: string | null; created_at: string; updated_at: string; };
+export type CaseTaskResponse = { id: string; case_id: string; inventory_account_id?: string | null; platform: string; category: string; priority: number; status: CaseTaskStatus; notes?: string | null; reference_number?: string | null; submitted_date?: string | null; evidence_count: number; evidence_document_id?: string | null; created_at: string; updated_at: string; };
 export type CaseTaskPatchRequest = { notes?: string | null; status?: CaseTaskStatus | null; reference_number?: string | null; submitted_date?: string | null; };
+export type CaseTaskEvidenceUploadInitRequest = { file_name: string; size_bytes: number; content_type: "application/pdf" | "image/png" | "image/jpeg"; sha256?: string | null; };
+export type CaseTaskEvidenceUploadInitResponse = { evidence_id: string; document_id: string; version_id: string; version_no: number; object_key: string; upload_url: string; upload_url_expires_in_seconds: number; plaintext_dek_b64: string; kms_key_id: string; doc_type: "case_task_evidence"; };
+export type CaseTaskEvidenceResponse = { id: string; document_id: string; file_name: string; content_type: string; document_state: string; scan_status?: string | null; scan_summary?: string | null; created_at: string; download_available: boolean; };
+export type CaseActivityEventResponse = { timestamp: string; event_type: string; task_id?: string | null; evidence_id?: string | null; actor_label: string; message: string; };
+export type CaseReportSummaryResponse = { case_id: string; owner_name: string; owner_email: string; status: CaseStatus; activated_at?: string | null; generated_at: string; total_tasks: number; resolved_task_count: number; escalated_task_count: number; clean_evidence_count: number; };
+export type CaseReportTaskRowResponse = { id: string; platform: string; category: string; priority: number; status: CaseTaskStatus; notes?: string | null; reference_number?: string | null; submitted_date?: string | null; evidence_count: number; clean_evidence_count: number; };
+export type CaseReportEvidenceReferenceResponse = { evidence_id: string; task_id: string; platform: string; category: string; file_name: string; content_type: string; created_at: string; };
+export type CaseReportResponse = { summary: CaseReportSummaryResponse; task_rows: CaseReportTaskRowResponse[]; clean_evidence_references: CaseReportEvidenceReferenceResponse[]; activity_timeline: CaseActivityEventResponse[]; report_ready: boolean; warnings: string[]; };
 export type TrustedContactCreateRequest = { name: string; email: string; role: "executor" | "viewer" | "packet_access" | "recovery_assist"; recovery_enabled?: boolean; };
 export type TrustedContactInviteRequest = { force_reissue?: boolean; };
 export type TrustedContactResponse = { id: string; name: string; email: string; role: "executor" | "viewer" | "packet_access" | "recovery_assist"; status: "pending" | "active" | "revoked"; };
@@ -118,9 +126,17 @@ export interface ActivateCaseArgs {
   body: CaseActivationConfirmRequest;
 }
 
+export interface GetCaseActivityArgs {
+  caseId: string;
+}
+
 export interface InitCaseDeathCertificateUploadArgs {
   caseId: string;
   body: CaseActivationUploadInitRequest;
+}
+
+export interface GetCaseReportArgs {
+  caseId: string;
 }
 
 export interface ListCaseTasksArgs {
@@ -135,6 +151,29 @@ export interface PatchCaseTaskArgs {
   caseId: string;
   taskId: string;
   body: CaseTaskPatchRequest;
+}
+
+export interface ListCaseTaskEvidenceArgs {
+  caseId: string;
+  taskId: string;
+}
+
+export interface InitCaseTaskEvidenceUploadArgs {
+  caseId: string;
+  taskId: string;
+  body: CaseTaskEvidenceUploadInitRequest;
+}
+
+export interface GetCaseTaskEvidenceDownloadArgs {
+  caseId: string;
+  taskId: string;
+  evidenceId: string;
+}
+
+export interface QueueCaseTaskEvidenceScanArgs {
+  caseId: string;
+  taskId: string;
+  evidenceId: string;
 }
 
 export interface InitDocumentUploadArgs {
@@ -404,12 +443,28 @@ export class VarasaanApiClient {
     });
   }
 
+  public async getCaseActivity(args: GetCaseActivityArgs, config: AxiosRequestConfig = {}): Promise<CaseActivityEventResponse[]> {
+    return this.request<CaseActivityEventResponse[]>({
+      ...config,
+      method: "GET",
+      url: `/api/v1/cases/${encodeURIComponent(String(args.caseId))}/activity`,
+    });
+  }
+
   public async initCaseDeathCertificateUpload(args: InitCaseDeathCertificateUploadArgs, config: AxiosRequestConfig = {}): Promise<CaseActivationUploadInitResponse> {
     return this.request<CaseActivationUploadInitResponse>({
       ...config,
       method: "POST",
       url: `/api/v1/cases/${encodeURIComponent(String(args.caseId))}/death-certificate/uploads/init`,
       data: args.body,
+    });
+  }
+
+  public async getCaseReport(args: GetCaseReportArgs, config: AxiosRequestConfig = {}): Promise<CaseReportResponse> {
+    return this.request<CaseReportResponse>({
+      ...config,
+      method: "GET",
+      url: `/api/v1/cases/${encodeURIComponent(String(args.caseId))}/report`,
     });
   }
 
@@ -428,6 +483,39 @@ export class VarasaanApiClient {
       method: "PATCH",
       url: `/api/v1/cases/${encodeURIComponent(String(args.caseId))}/tasks/${encodeURIComponent(String(args.taskId))}`,
       data: args.body,
+    });
+  }
+
+  public async listCaseTaskEvidence(args: ListCaseTaskEvidenceArgs, config: AxiosRequestConfig = {}): Promise<CaseTaskEvidenceResponse[]> {
+    return this.request<CaseTaskEvidenceResponse[]>({
+      ...config,
+      method: "GET",
+      url: `/api/v1/cases/${encodeURIComponent(String(args.caseId))}/tasks/${encodeURIComponent(String(args.taskId))}/evidence`,
+    });
+  }
+
+  public async initCaseTaskEvidenceUpload(args: InitCaseTaskEvidenceUploadArgs, config: AxiosRequestConfig = {}): Promise<CaseTaskEvidenceUploadInitResponse> {
+    return this.request<CaseTaskEvidenceUploadInitResponse>({
+      ...config,
+      method: "POST",
+      url: `/api/v1/cases/${encodeURIComponent(String(args.caseId))}/tasks/${encodeURIComponent(String(args.taskId))}/evidence/uploads/init`,
+      data: args.body,
+    });
+  }
+
+  public async getCaseTaskEvidenceDownload(args: GetCaseTaskEvidenceDownloadArgs, config: AxiosRequestConfig = {}): Promise<DocumentDownloadResponse> {
+    return this.request<DocumentDownloadResponse>({
+      ...config,
+      method: "GET",
+      url: `/api/v1/cases/${encodeURIComponent(String(args.caseId))}/tasks/${encodeURIComponent(String(args.taskId))}/evidence/${encodeURIComponent(String(args.evidenceId))}/download`,
+    });
+  }
+
+  public async queueCaseTaskEvidenceScan(args: QueueCaseTaskEvidenceScanArgs, config: AxiosRequestConfig = {}): Promise<ScanDispatchResponse> {
+    return this.request<ScanDispatchResponse>({
+      ...config,
+      method: "POST",
+      url: `/api/v1/cases/${encodeURIComponent(String(args.caseId))}/tasks/${encodeURIComponent(String(args.taskId))}/evidence/${encodeURIComponent(String(args.evidenceId))}/scan`,
     });
   }
 

@@ -275,6 +275,17 @@ class CaseTask(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
+class CaseTaskEvidence(Base):
+    __tablename__ = "case_task_evidence"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_id)
+    case_task_id: Mapped[str] = mapped_column(ForeignKey("case_tasks.id", ondelete="CASCADE"), index=True)
+    document_id: Mapped[str] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class InviteToken(Base):
     __tablename__ = "invite_tokens"
 

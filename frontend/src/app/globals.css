@@ -1194,6 +1194,12 @@ button {
   color: var(--text-secondary);
 }
 
+.executor-workspace-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 .executor-status-activation_pending {
   background: rgba(245, 158, 11, 0.15);
   color: #fbbf24;
@@ -1320,6 +1326,132 @@ button {
   gap: 0.25rem;
 }
 
+.executor-evidence-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: rgba(15, 23, 42, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.executor-evidence-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.executor-evidence-list,
+.executor-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.executor-evidence-item,
+.executor-activity-item {
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: rgba(2, 6, 23, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.executor-evidence-item-header,
+.executor-activity-item-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.executor-activity-item-header span {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.executor-report-header {
+  align-items: stretch;
+}
+
+.report-print-page {
+  padding-bottom: 4rem;
+}
+
+.report-print-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.report-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.report-summary-card {
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.report-summary-card span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.report-summary-card strong {
+  color: var(--text-primary);
+}
+
+.report-readiness-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.executor-report-warning-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.executor-report-table-wrapper {
+  overflow-x: auto;
+}
+
+.executor-report-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.executor-report-table th,
+.executor-report-table td {
+  padding: 0.85rem 0.9rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  vertical-align: top;
+}
+
+.executor-report-table th {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.executor-report-table td {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
 @media (min-width: 960px) {
   .executor-shell-bar {
     grid-template-columns: auto 1fr auto auto;
@@ -1343,6 +1475,67 @@ button {
 
   .executor-task-readonly {
     grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  :root {
+    --bg-base: #ffffff;
+    --bg-surface: #ffffff;
+    --bg-surface-hover: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+  }
+
+  body {
+    background: #ffffff;
+    color: #0f172a;
+  }
+
+  .executor-shell-bar,
+  .report-print-actions,
+  .inventory-feedback,
+  .input-error-msg,
+  .dialog-overlay,
+  .dialog-content {
+    display: none !important;
+  }
+
+  .executor-shell-root,
+  .executor-container,
+  .executor-shell-content {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .glass-panel,
+  .executor-evidence-item,
+  .executor-activity-item,
+  .report-summary-card {
+    background: #ffffff;
+    border: 1px solid #d7dee8;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .executor-header,
+  .inventory-panel {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .status-indicator.success {
+    color: #166534;
+    background: #dcfce7;
+    border-color: #86efac;
+  }
+
+  .status-indicator.warning {
+    color: #92400e;
+    background: #fef3c7;
+    border-color: #fcd34d;
   }
 }
 

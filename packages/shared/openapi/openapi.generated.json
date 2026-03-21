@@ -1759,6 +1759,268 @@
         }
       }
     },
+    "/api/v1/cases/{caseId}/activity": {
+      "get": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "getCaseActivity",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Case activity timeline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaseActivityEventResponse"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{caseId}/tasks/{taskId}/evidence": {
+      "get": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "listCaseTaskEvidence",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          },
+          {
+            "$ref": "#/components/parameters/CaseTaskId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task evidence files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaseTaskEvidenceResponse"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{caseId}/tasks/{taskId}/evidence/uploads/init": {
+      "post": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "initCaseTaskEvidenceUpload",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          },
+          {
+            "$ref": "#/components/parameters/CaseTaskId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseTaskEvidenceUploadInitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Task evidence upload initialized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseTaskEvidenceUploadInitResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{caseId}/tasks/{taskId}/evidence/{evidenceId}/scan": {
+      "post": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "queueCaseTaskEvidenceScan",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          },
+          {
+            "$ref": "#/components/parameters/CaseTaskId"
+          },
+          {
+            "$ref": "#/components/parameters/CaseTaskEvidenceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Evidence scan queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanDispatchResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{caseId}/tasks/{taskId}/evidence/{evidenceId}/download": {
+      "get": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "getCaseTaskEvidenceDownload",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          },
+          {
+            "$ref": "#/components/parameters/CaseTaskId"
+          },
+          {
+            "$ref": "#/components/parameters/CaseTaskEvidenceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed download URL for clean task evidence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDownloadResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{caseId}/report": {
+      "get": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "getCaseReport",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Printable closure report data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseReportResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/api/v1/trusted-contacts": {
       "post": {
         "tags": [
@@ -2015,6 +2277,15 @@
       },
       "CaseTaskId": {
         "name": "taskId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "CaseTaskEvidenceId": {
+        "name": "evidenceId",
         "in": "path",
         "required": true,
         "schema": {
@@ -3185,6 +3456,7 @@
           "category",
           "priority",
           "status",
+          "evidence_count",
           "created_at",
           "updated_at"
         ],
@@ -3227,10 +3499,14 @@
             "format": "date",
             "nullable": true
           },
+          "evidence_count": {
+            "type": "integer"
+          },
           "evidence_document_id": {
             "type": "string",
             "format": "uuid",
-            "nullable": true
+            "nullable": true,
+            "deprecated": true
           },
           "created_at": {
             "type": "string",
@@ -3265,6 +3541,351 @@
             "type": "string",
             "format": "date",
             "nullable": true
+          }
+        }
+      },
+      "CaseTaskEvidenceUploadInitRequest": {
+        "type": "object",
+        "required": [
+          "file_name",
+          "size_bytes",
+          "content_type"
+        ],
+        "properties": {
+          "file_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "content_type": {
+            "type": "string",
+            "enum": [
+              "application/pdf",
+              "image/png",
+              "image/jpeg"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CaseTaskEvidenceUploadInitResponse": {
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "document_id",
+          "version_id",
+          "version_no",
+          "object_key",
+          "upload_url",
+          "upload_url_expires_in_seconds",
+          "plaintext_dek_b64",
+          "kms_key_id",
+          "doc_type"
+        ],
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_no": {
+            "type": "integer"
+          },
+          "object_key": {
+            "type": "string"
+          },
+          "upload_url": {
+            "type": "string"
+          },
+          "upload_url_expires_in_seconds": {
+            "type": "integer"
+          },
+          "plaintext_dek_b64": {
+            "type": "string"
+          },
+          "kms_key_id": {
+            "type": "string"
+          },
+          "doc_type": {
+            "type": "string",
+            "enum": [
+              "case_task_evidence"
+            ]
+          }
+        }
+      },
+      "CaseTaskEvidenceResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "document_id",
+          "file_name",
+          "content_type",
+          "document_state",
+          "created_at",
+          "download_available"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "file_name": {
+            "type": "string"
+          },
+          "content_type": {
+            "type": "string"
+          },
+          "document_state": {
+            "type": "string"
+          },
+          "scan_status": {
+            "type": "string",
+            "nullable": true
+          },
+          "scan_summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "download_available": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CaseActivityEventResponse": {
+        "type": "object",
+        "required": [
+          "timestamp",
+          "event_type",
+          "actor_label",
+          "message"
+        ],
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "evidence_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "actor_label": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "CaseReportSummaryResponse": {
+        "type": "object",
+        "required": [
+          "case_id",
+          "owner_name",
+          "owner_email",
+          "status",
+          "generated_at",
+          "total_tasks",
+          "resolved_task_count",
+          "escalated_task_count",
+          "clean_evidence_count"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_name": {
+            "type": "string"
+          },
+          "owner_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CaseStatus"
+          },
+          "activated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total_tasks": {
+            "type": "integer"
+          },
+          "resolved_task_count": {
+            "type": "integer"
+          },
+          "escalated_task_count": {
+            "type": "integer"
+          },
+          "clean_evidence_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "CaseReportTaskRowResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "platform",
+          "category",
+          "priority",
+          "status",
+          "evidence_count",
+          "clean_evidence_count"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CaseTaskStatus"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "submitted_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "evidence_count": {
+            "type": "integer"
+          },
+          "clean_evidence_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "CaseReportEvidenceReferenceResponse": {
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "task_id",
+          "platform",
+          "category",
+          "file_name",
+          "content_type",
+          "created_at"
+        ],
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "task_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "file_name": {
+            "type": "string"
+          },
+          "content_type": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CaseReportResponse": {
+        "type": "object",
+        "required": [
+          "summary",
+          "task_rows",
+          "clean_evidence_references",
+          "activity_timeline",
+          "report_ready",
+          "warnings"
+        ],
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/CaseReportSummaryResponse"
+          },
+          "task_rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseReportTaskRowResponse"
+            }
+          },
+          "clean_evidence_references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseReportEvidenceReferenceResponse"
+            }
+          },
+          "activity_timeline": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseActivityEventResponse"
+            }
+          },
+          "report_ready": {
+            "type": "boolean"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
