@@ -20,6 +20,8 @@ This app is built with **Next.js App Router** + TypeScript.
 - `PLAYWRIGHT_BASE_URL` - frontend base URL used by Playwright.
 - `PLAYWRIGHT_API_BASE_URL` - backend base URL used by Playwright helpers.
 
+`NEXT_PUBLIC_API_BASE_URL` is compiled into the production bundle, so rebuild the app before `npm run start` if the backend origin changes.
+
 ## Auth UX
 
 Implemented routes:
@@ -37,6 +39,13 @@ Protected workspaces:
 - `/dashboard/packets`
 - `/dashboard/exports`
 - `/dashboard/billing`
+- `/executor`
+- `/executor/cases/[caseId]`
+
+Executor routes:
+
+- `/executor` - landing page for pending and active executor cases, including the pending-case activation screen.
+- `/executor/cases/[caseId]` - task-centric executor workspace with filters, Kanban columns, and task editing.
 
 Compatibility redirects:
 

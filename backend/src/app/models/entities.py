@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -24,6 +24,7 @@ class PolicyType(StrEnum):
 
 
 class TrustedContactRole(StrEnum):
+    EXECUTOR = "executor"
     VIEWER = "viewer"
     PACKET_ACCESS = "packet_access"
     RECOVERY_ASSIST = "recovery_assist"
@@ -98,6 +99,25 @@ class HeartbeatStatus(StrEnum):
     ACTIVE = "active"
     PAUSED = "paused"
     OVERDUE = "overdue"
+    ESCALATED = "escalated"
+
+
+class CaseStatus(StrEnum):
+    ACTIVATION_PENDING = "activation_pending"
+    ACTIVE = "active"
+    CLOSED = "closed"
+
+
+class CaseParticipantRole(StrEnum):
+    EXECUTOR = "executor"
+
+
+class CaseTaskStatus(StrEnum):
+    NOT_STARTED = "not_started"
+    IN_PROGRESS = "in_progress"
+    SUBMITTED = "submitted"
+    WAITING = "waiting"
+    RESOLVED = "resolved"
     ESCALATED = "escalated"
 
 
@@ -191,6 +211,66 @@ class Heartbeat(Base):
     escalation_level: Mapped[int] = mapped_column(Integer, default=0)
     last_reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     executor_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class Case(Base):
+    __tablename__ = "cases"
+    __table_args__ = (UniqueConstraint("owner_user_id", name="uq_cases_owner_user_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_id)
+    owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    status: Mapped[CaseStatus] = mapped_column(Enum(CaseStatus), default=CaseStatus.ACTIVATION_PENDING, index=True)
+    death_certificate_document_id: Mapped[str | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    death_certificate_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("document_versions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class CaseParticipant(Base):
+    __tablename__ = "case_participants"
+    __table_args__ = (UniqueConstraint("case_id", "trusted_contact_id", name="uq_case_participants_case_contact"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_id)
+    case_id: Mapped[str] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), index=True)
+    trusted_contact_id: Mapped[str] = mapped_column(ForeignKey("trusted_contacts.id", ondelete="CASCADE"), index=True)
+    role: Mapped[CaseParticipantRole] = mapped_column(Enum(CaseParticipantRole), default=CaseParticipantRole.EXECUTOR)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CaseTask(Base):
+    __tablename__ = "case_tasks"
+    __table_args__ = (UniqueConstraint("case_id", "inventory_account_id", name="uq_case_tasks_case_inventory_account"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_id)
+    case_id: Mapped[str] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), index=True)
+    inventory_account_id: Mapped[str | None] = mapped_column(
+        ForeignKey("inventory_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    platform: Mapped[str] = mapped_column(String(120), nullable=False)
+    category: Mapped[str] = mapped_column(String(80), nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[CaseTaskStatus] = mapped_column(Enum(CaseTaskStatus), default=CaseTaskStatus.NOT_STARTED, index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reference_number: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    submitted_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    evidence_document_id: Mapped[str | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

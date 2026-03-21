@@ -1,5 +1,5 @@
-import ExecutorDash from '../../views/ExecutorDash';
+import { ExecutorLandingScreen } from './executor-landing-screen';
 
 export default function ExecutorPage() {
-  return <ExecutorDash />;
+  return <ExecutorLandingScreen />;
 }

@@ -985,23 +985,58 @@ button {
 }
 
 /* Executor */
-.executor-container {
+.executor-shell-root {
   max-width: var(--max-w-app);
   margin: 0 auto;
-  padding: 4rem 2rem;
+  padding: 2rem;
+}
+
+.executor-shell-bar {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--radius-xl);
+  margin-top: 1.5rem;
+}
+
+.executor-shell-brand,
+.executor-shell-account {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.executor-shell-nav {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.executor-shell-content {
   min-height: calc(100vh - var(--header-height));
+}
+
+.executor-shell-alert {
+  margin: 1rem 0 0;
+}
+
+.executor-container {
   display: flex;
   flex-direction: column;
-  gap: 3rem;
+  gap: 1.5rem;
+  padding: 2rem 0 3rem;
 }
 
 .executor-header {
-  padding: 2.5rem;
+  padding: 2rem;
   border-radius: var(--radius-xl);
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.25rem;
   border-top: 4px solid var(--brand-accent);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.16), transparent 36%),
+    rgba(15, 23, 42, 0.7);
 }
 
 @media (min-width: 768px) {
@@ -1013,7 +1048,11 @@ button {
 }
 
 .executor-header-content {
-  max-width: 600px;
+  max-width: 720px;
+}
+
+.executor-workspace-header {
+  align-items: stretch;
 }
 
 .status-badge {
@@ -1034,9 +1073,9 @@ button {
 }
 
 .executor-title {
-  font-size: 1.8rem;
+  font-size: 1.9rem;
   color: var(--text-primary);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .executor-subtitle {
@@ -1045,127 +1084,266 @@ button {
   font-size: 1rem;
 }
 
-.executor-quick-actions {
+.executor-section {
+  padding: 1.5rem;
+}
+
+.executor-section-header {
   display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.executor-case-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 1rem;
 }
 
-.action-btn {
+.executor-case-card {
+  text-align: left;
+  padding: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: var(--radius-lg);
+  background: rgba(15, 23, 42, 0.45);
   display: flex;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.section-heading {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 1.5rem;
+.executor-case-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: var(--shadow-md);
+}
+
+.executor-case-card.is-selected {
+  border-color: rgba(56, 189, 248, 0.75);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.3);
+}
+
+.executor-case-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.executor-case-card h3 {
   color: var(--text-primary);
 }
 
-.task-grid {
+.executor-case-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.executor-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.executor-activation-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1.5rem;
 }
 
-.task-card {
-  padding: 1.5rem;
+.executor-activation-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.executor-activation-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.executor-activation-meta span,
+.executor-task-readonly span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.executor-activation-meta strong,
+.executor-task-readonly strong {
+  color: var(--text-primary);
+}
+
+.executor-active-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.executor-active-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  color: var(--text-secondary);
+}
+
+.executor-status-activation_pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.executor-status-active {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+
+.executor-status-closed {
+  background: rgba(148, 163, 184, 0.18);
+  color: #cbd5f5;
+}
+
+.executor-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.executor-board {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(220px, 1fr));
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.executor-board-column {
+  min-width: 220px;
+  padding: 1rem;
   border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  transition: transform var(--transition-normal);
-  border-left: 3px solid transparent;
+  background: rgba(15, 23, 42, 0.45);
 }
 
-.task-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-md);
-}
-
-.task-card.urgent {
-  border-left-color: var(--brand-destructive);
-}
-
-.task-card.pending {
-  border-left-color: #f59e0b;
-}
-
-.task-card.completed {
-  border-left-color: #22c55e;
-  opacity: 0.7;
-}
-
-.task-header {
+.executor-board-column-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
 }
 
-.platform-tag {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 700;
-}
-
-.platform-tag.finance {
-  color: var(--brand-primary);
-}
-
-.platform-tag.communication {
-  color: var(--brand-accent);
-}
-
-.platform-tag.social {
-  color: #a78bfa;
-}
-
-.urgency-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.urgency-dot.red {
-  background-color: var(--brand-destructive);
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
-}
-
-.urgency-dot.yellow {
-  background-color: #f59e0b;
-}
-
-.urgency-dot.green {
-  background-color: #22c55e;
-}
-
-.task-title {
-  font-size: 1.15rem;
+.executor-board-column-header h3 {
+  font-size: 1rem;
   color: var(--text-primary);
 }
 
-.task-desc {
-  font-size: 0.9rem;
+.executor-board-column-header span {
   color: var(--text-secondary);
-  line-height: 1.5;
-  flex-grow: 1;
 }
 
-.task-footer {
-  margin-top: 0.5rem;
+.executor-board-column-body {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 120px;
+}
+
+.executor-board-empty {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.executor-task-card {
+  width: 100%;
+  text-align: left;
+  padding: 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(2, 6, 23, 0.48);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.executor-task-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.executor-task-card-top {
+  display: flex;
   justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
 }
 
-.success-text {
+.executor-task-card strong {
+  color: var(--text-primary);
+}
+
+.executor-task-card p,
+.executor-task-card span {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.executor-list-item {
+  align-items: flex-start;
+}
+
+.executor-textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.executor-task-readonly {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.executor-task-readonly div {
   display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  color: #4ade80;
-  font-size: 0.85rem;
-  font-weight: 600;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+@media (min-width: 960px) {
+  .executor-shell-bar {
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+  }
+
+  .executor-activation-grid {
+    grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+    align-items: start;
+  }
+}
+
+@media (max-width: 767px) {
+  .executor-shell-root {
+    padding: 1rem;
+  }
+
+  .executor-container {
+    padding: 1rem 0 2rem;
+  }
+
+  .executor-task-readonly {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* UI components */

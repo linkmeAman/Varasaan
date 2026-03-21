@@ -108,10 +108,11 @@ export function TrustedContactsScreen() {
               onChange={(event) =>
                 setDraft((current) => ({
                   ...current,
-                  role: event.target.value as 'viewer' | 'packet_access' | 'recovery_assist',
+                  role: event.target.value as TrustedContactResponse['role'],
                 }))
               }
             >
+              <option value="executor">Executor</option>
               <option value="viewer">Viewer</option>
               <option value="packet_access">Packet Access</option>
               <option value="recovery_assist">Recovery Assist</option>

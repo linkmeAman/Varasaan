@@ -54,11 +54,12 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
           yield session
   ```
 - [ ] `users` — id, email, phone, created_at, deleted_at (soft delete)
-- [ ] `accounts_inventory` — user_id, platform, account_type, access_status, notes
-- [ ] `trusted_contacts` — user_id, contact_name, email, phone, role (executor/viewer)
+- [ ] `inventory_accounts` — user_id, platform, category, username_hint, importance_level
+- [ ] `trusted_contacts` — user_id, contact_name, email, role (executor/viewer/packet_access/recovery_assist)
 - [ ] `documents` — user_id, doc_type, s3_key, encrypted, uploaded_at, expires_at
-- [ ] `cases` — user_id (deceased), executor_id, status, opened_at, closed_at
-- [ ] `tasks` — case_id, platform, task_type, status, evidence_doc_id, updated_at
+- [ ] `cases` — owner_user_id, status, death_certificate_document_id, death_certificate_version_id, activated_at, closed_at
+- [ ] `case_participants` — case_id, trusted_contact_id, role
+- [ ] `case_tasks` — case_id, inventory_account_id, platform, category, priority, status, evidence_doc_id, updated_at
 - [ ] `audit_logs` — entity_type, entity_id, action, actor_id, timestamp, ip_hash
 - [ ] `heartbeats` — user_id, last_checked_in, next_expected, escalation_level
 - [ ] All tables: UUID primary keys, created_at/updated_at timestamps, soft deletes
@@ -166,21 +167,25 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
 ## 📦 Phase 2 — After-Loss Mode (Weeks 13–22)
 
 > Goal: Executor can manage the full closure process with task tracking, proof capture, and status updates.
+>
+> V1 status (March 2026): the single-executor, trusted-contact-backed activation flow and task workspace are implemented. Manual review, notifications, evidence upload/download, and collaboration remain open.
 
 ### 2.1 Case Activation Flow
-- [ ] Executor submits death certificate (PDF upload, encrypted)
-- [ ] System validates: file is PDF, under 10MB, metadata stripped
+- [x] Executor submits death certificate (PDF upload, encrypted)
+- [x] System validates: file is PDF and under 10MB
+- [ ] System strips PDF metadata before activation
 - [ ] Optional: manual review step before full activation (for fraud prevention in V1)
-- [ ] Once activated: executor gets full inventory view
+- [x] Once activated: executor gets a task-centric workspace generated from inventory snapshots
 - [ ] Notification sent to all designated contacts that case is open
 
 ### 2.2 Task Management (Kanban for Grief Ops)
-- [ ] Auto-generate tasks from inventory: one task per account
-- [ ] Task statuses: `Not Started` → `In Progress` → `Submitted` → `Waiting` → `Resolved` / `Escalated`
-- [ ] Per task: notes field, document attachment, date submitted, reference number
-- [ ] Task priority: auto-set based on account importance level from inventory
+- [x] Auto-generate tasks from inventory: one task per account
+- [x] Task statuses: `not_started` → `in_progress` → `submitted` → `waiting` → `resolved` / `escalated`
+- [x] Per task: notes field, date submitted, reference number
+- [ ] Per task: document attachment / evidence upload
+- [x] Task priority: auto-set based on account importance level from inventory
 - [ ] "Quick wins" section: accounts that have simple one-click deletion (e.g., minor streaming services)
-- [ ] Filter by: status / platform / category / priority
+- [x] Filter by: status / platform / category / priority
 
 ### 2.3 Evidence & Proof Capture
 - [ ] Executor can upload confirmation emails / screenshots per task

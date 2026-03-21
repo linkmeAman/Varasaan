@@ -15,7 +15,7 @@ This document tracks the actual implementation progress against the `PRODUCT_DEV
 ---
 
 ## 🟡 Phase 1 — MVP: Planning Mode (In Progress)
-*Backend APIs are heavily built and synced. The primary focus right now should be completing the Frontend UI and tying everything together.*
+*Core planning-mode frontend surfaces are now in place. The primary focus is closing out the remaining payment and heartbeat gaps.*
 
 ### Backend / API (Mostly Complete)
 - [x] **Auth + Onboarding**: Signup, login, email verification, password reset APIs are synced.
@@ -27,19 +27,20 @@ This document tracks the actual implementation progress against the `PRODUCT_DEV
 - [ ] **Heartbeat / Dead-Man Switch**: Cron jobs and related endpoints for the heartbeat ping and escalation reminders.
 
 ### Frontend / UI (Current Focus)
-- [ ] **Auth Flow Screens**: Login, Registration, Password Reset UI.
-- [ ] **Dashboard / Inventory Builder**: UI to add/manage 50+ platforms, fill credentials hints, etc.
-- [ ] **Trusted Contacts UI**: Screens to invite executors and setup relationships.
+- [x] **Auth Flow Screens**: Login, Registration, Password Reset UI.
+- [x] **Dashboard / Inventory Builder**: UI to add/manage inventory accounts and account details.
+- [x] **Trusted Contacts UI**: Screens to invite executors and setup relationships.
 - [ ] **Payment & Checkout UI**: Razorpay frontend integration for Essential/Executor tiers.
-- [ ] **Document Uploads UI**: Safe client-side UI to upload death certificates/evidence.
+- [x] **Document Uploads UI**: Owner document vault uploads plus executor death-certificate activation upload.
 
 ---
 
-## 🔴 Phase 2 — After-Loss Mode (Pending)
-*This phase will be tackled once the MVP Planning Mode is fully usable by the person planning their estate.*
+## 🟠 Phase 2 — After-Loss Mode (In Progress)
+*The first Phase 2.1 / 2.2 slice is now implemented for a single executor per owner via trusted contacts. The remaining items below stay out of scope for this slice.*
 
-- [ ] **Case Activation Flow** (Executor dashboard activation, death certificate validation)
-- [ ] **Task Management / Kanban** (Auto-generating tasks from inventory)
+- [x] **Executor Designation + Pending Cases**: Owners can assign an `executor` role in trusted contacts, and accepted executors can see pending or active cases.
+- [x] **Case Activation Flow (V1)**: Executor-only pending case visibility, case-scoped death-certificate upload, PDF / 10 MB validation, and idempotent activation.
+- [x] **Task Management / Kanban (V1)**: One task per inventory account, stable snapshot generation at activation, board/list filters, and editable notes/status/reference/submitted date.
 - [ ] **Evidence & Proof Capture** (Uploading completion states)
 - [ ] **Subscription Bleeding Stopper** (Cancellation checklists)
 - [ ] **Family Workspace** (Collaboration threads and assignment)
@@ -57,6 +58,6 @@ This document tracks the actual implementation progress against the `PRODUCT_DEV
 
 ## 🚀 Immediate Next Steps (What to do today)
 
-1. **Frontend UI Implementation**: Continue building the React/Next.js screens (`apps`, `views`, `components`) to consume the synced OpenAPIs for Auth, Inventory, and Trusted Contacts.
-2. **Heartbeat System Backend**: Implement the background job (Celery/Postgres) and endpoints for the heartbeat/dead-man switch mechanism.
-3. **End-to-End Testing**: Start tying the frontend directly to the staging backend testing Razorpay, Email flows, and PDF generation from the actual UI.
+1. **Heartbeat System Backend**: Implement the background job (Celery/Postgres) and endpoints for the heartbeat/dead-man switch mechanism.
+2. **Payment & Checkout Finish**: Complete the remaining frontend payment flow and staging validation.
+3. **Finish the remaining Phase 2 work**: evidence uploads, manual review, notifications, multi-participant collaboration, and closure reporting.

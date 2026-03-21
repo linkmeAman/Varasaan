@@ -1470,6 +1470,297 @@ export const openApiDocument = {
         }
       }
     },
+    "/api/v1/cases": {
+      "get": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "listAccessibleCases",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Accessible executor cases",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaseSummaryResponse"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{caseId}": {
+      "get": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "getCaseSummary",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Executor case summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseSummaryResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{caseId}/death-certificate/uploads/init": {
+      "post": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "initCaseDeathCertificateUpload",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseActivationUploadInitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Case-scoped death certificate upload initialized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseActivationUploadInitResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{caseId}/activate": {
+      "post": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "activateCase",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseActivationConfirmRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Case activated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseSummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{caseId}/tasks": {
+      "get": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "listCaseTasks",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CaseTaskStatus"
+            }
+          },
+          {
+            "name": "platform",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Case tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaseTaskResponse"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{caseId}/tasks/{taskId}": {
+      "patch": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "patchCaseTask",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          },
+          {
+            "$ref": "#/components/parameters/CaseTaskId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseTaskPatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Case task updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseTaskResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/api/v1/trusted-contacts": {
       "post": {
         "tags": [
@@ -1708,6 +1999,24 @@ export const openApiDocument = {
       },
       "PacketJobId": {
         "name": "packetJobId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "CaseId": {
+        "name": "caseId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "CaseTaskId": {
+        "name": "taskId",
         "in": "path",
         "required": true,
         "schema": {
@@ -2656,6 +2965,311 @@ export const openApiDocument = {
           }
         }
       },
+      "CaseStatus": {
+        "type": "string",
+        "enum": [
+          "activation_pending",
+          "active",
+          "closed"
+        ]
+      },
+      "CaseTaskStatus": {
+        "type": "string",
+        "enum": [
+          "not_started",
+          "in_progress",
+          "submitted",
+          "waiting",
+          "resolved",
+          "escalated"
+        ]
+      },
+      "CaseTaskStatusCounts": {
+        "type": "object",
+        "required": [
+          "not_started",
+          "in_progress",
+          "submitted",
+          "waiting",
+          "resolved",
+          "escalated"
+        ],
+        "properties": {
+          "not_started": {
+            "type": "integer",
+            "default": 0
+          },
+          "in_progress": {
+            "type": "integer",
+            "default": 0
+          },
+          "submitted": {
+            "type": "integer",
+            "default": 0
+          },
+          "waiting": {
+            "type": "integer",
+            "default": 0
+          },
+          "resolved": {
+            "type": "integer",
+            "default": 0
+          },
+          "escalated": {
+            "type": "integer",
+            "default": 0
+          }
+        }
+      },
+      "CaseSummaryResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_user_id",
+          "owner_name",
+          "owner_email",
+          "status",
+          "created_at",
+          "updated_at",
+          "task_count",
+          "task_status_counts"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_name": {
+            "type": "string"
+          },
+          "owner_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CaseStatus"
+          },
+          "death_certificate_document_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "death_certificate_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "activated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "task_count": {
+            "type": "integer"
+          },
+          "task_status_counts": {
+            "$ref": "#/components/schemas/CaseTaskStatusCounts"
+          }
+        }
+      },
+      "CaseActivationUploadInitRequest": {
+        "type": "object",
+        "required": [
+          "size_bytes",
+          "content_type"
+        ],
+        "properties": {
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10485760
+          },
+          "content_type": {
+            "type": "string",
+            "enum": [
+              "application/pdf"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CaseActivationUploadInitResponse": {
+        "type": "object",
+        "required": [
+          "document_id",
+          "version_id",
+          "version_no",
+          "object_key",
+          "upload_url",
+          "upload_url_expires_in_seconds",
+          "plaintext_dek_b64",
+          "kms_key_id",
+          "doc_type"
+        ],
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_no": {
+            "type": "integer"
+          },
+          "object_key": {
+            "type": "string"
+          },
+          "upload_url": {
+            "type": "string"
+          },
+          "upload_url_expires_in_seconds": {
+            "type": "integer"
+          },
+          "plaintext_dek_b64": {
+            "type": "string"
+          },
+          "kms_key_id": {
+            "type": "string"
+          },
+          "doc_type": {
+            "type": "string",
+            "enum": [
+              "death_certificate"
+            ]
+          }
+        }
+      },
+      "CaseActivationConfirmRequest": {
+        "type": "object",
+        "required": [
+          "document_id",
+          "version_id"
+        ],
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "CaseTaskResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "case_id",
+          "platform",
+          "category",
+          "priority",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "inventory_account_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "platform": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CaseTaskStatus"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "submitted_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "evidence_document_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CaseTaskPatchRequest": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CaseTaskStatus"
+              }
+            ],
+            "nullable": true
+          },
+          "reference_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "submitted_date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          }
+        }
+      },
       "TrustedContactCreateRequest": {
         "type": "object",
         "required": [
@@ -2674,6 +3288,7 @@ export const openApiDocument = {
           "role": {
             "type": "string",
             "enum": [
+              "executor",
               "viewer",
               "packet_access",
               "recovery_assist"
@@ -2718,6 +3333,7 @@ export const openApiDocument = {
           "role": {
             "type": "string",
             "enum": [
+              "executor",
               "viewer",
               "packet_access",
               "recovery_assist"
