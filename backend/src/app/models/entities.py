@@ -108,6 +108,13 @@ class CaseStatus(StrEnum):
     CLOSED = "closed"
 
 
+class CaseActivationReviewStatus(StrEnum):
+    NOT_REQUESTED = "not_requested"
+    PENDING_REVIEW = "pending_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class CaseParticipantRole(StrEnum):
     EXECUTOR = "executor"
 
@@ -228,6 +235,15 @@ class Case(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_id)
     owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     status: Mapped[CaseStatus] = mapped_column(Enum(CaseStatus), default=CaseStatus.ACTIVATION_PENDING, index=True)
+    activation_review_status: Mapped[CaseActivationReviewStatus] = mapped_column(
+        Enum(CaseActivationReviewStatus),
+        default=CaseActivationReviewStatus.NOT_REQUESTED,
+        index=True,
+    )
+    activation_review_reason: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    activation_review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    activation_review_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    activation_review_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     death_certificate_document_id: Mapped[str | None] = mapped_column(
         ForeignKey("documents.id", ondelete="SET NULL"),
         nullable=True,
@@ -241,6 +257,8 @@ class Case(Base):
     activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     evidence_retention_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    death_certificate_sanitized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    death_certificate_metadata_stripped: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
