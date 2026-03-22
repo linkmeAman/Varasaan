@@ -42,3 +42,9 @@ backend-e2e.log
 backend-e2e.err.log
 frontend-e2e.log
 frontend-e2e.err.log
+
+# Local dev runtime artifacts
+/.tmp-*.log
+backend/.tmp-*.log
+backend/.tmp-local.db
+frontend/.tmp-*.log
