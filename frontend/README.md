@@ -22,6 +22,19 @@ This app is built with **Next.js App Router** + TypeScript.
 
 `NEXT_PUBLIC_API_BASE_URL` is compiled into the production bundle, so rebuild the app before `npm run start` if the backend origin changes.
 
+## Local Full-Stack Run
+
+For the full frontend + backend local startup flow, use the root [launch runbook](../LAUNCH_RUNBOOK.md#local-development).
+
+Frontend-specific local command:
+
+```powershell
+$env:NEXT_PUBLIC_API_BASE_URL = 'http://127.0.0.1:8000'
+npm run dev -- --hostname localhost --port 3000
+```
+
+Open the app at `http://localhost:3000`.
+
 ## Auth UX
 
 Implemented routes:
