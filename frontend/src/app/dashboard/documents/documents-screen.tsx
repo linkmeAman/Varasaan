@@ -30,8 +30,8 @@ export function DocumentsScreen() {
       <div className="inventory-manager-header">
         <div>
           <p className="item-badge">Documents</p>
-          <h2 className="dash-title">Document Vault</h2>
-          <p className="dash-subtitle">Upload encrypted documents, monitor scans, and manage access grants.</p>
+          <h2 className="dash-title">Document Workspace</h2>
+          <p className="dash-subtitle">Upload planning and legal documents, monitor scans, and manage access grants.</p>
         </div>
       </div>
 

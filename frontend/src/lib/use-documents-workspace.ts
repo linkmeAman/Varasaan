@@ -46,7 +46,7 @@ export function useDocumentsWorkspace() {
       setTrustedContacts(listedContacts.filter((contact) => contact.status === 'active'));
       return listedDocuments;
     } catch (loadError) {
-      setError(readApiErrorMessage(loadError, 'Unable to load document vault state.'));
+      setError(readApiErrorMessage(loadError, 'Unable to load document workspace.'));
       return [];
     }
   };

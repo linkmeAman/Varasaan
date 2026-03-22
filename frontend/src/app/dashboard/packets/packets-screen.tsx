@@ -66,7 +66,7 @@ export function PacketsScreen() {
     }
 
     void refreshJobs().catch((refreshError) => {
-      setError(readApiErrorMessage(refreshError, 'Unable to load packet jobs.'));
+      setError(readApiErrorMessage(refreshError, 'Unable to load evidence packets.'));
     });
   }, [user]);
 
@@ -101,9 +101,9 @@ export function PacketsScreen() {
       const nextIds = [created.id, ...existing.filter((item) => item !== created.id)];
       writeStoredPacketJobIds(nextIds);
       setJobs((current) => [created, ...current.filter((item) => item.id !== created.id)]);
-      setFeedback('Packet generation job queued.');
+      setFeedback('Evidence packet queued.');
     } catch (createError) {
-      setError(readApiErrorMessage(createError, 'Unable to create packet job.'));
+      setError(readApiErrorMessage(createError, 'Unable to queue evidence packet.'));
     } finally {
       setLoadingAction('');
     }
@@ -113,9 +113,9 @@ export function PacketsScreen() {
     <div className="inventory-manager animate-fade-in">
       <div className="inventory-manager-header">
         <div>
-          <p className="item-badge">Packets</p>
-          <h2 className="dash-title">Packet Jobs</h2>
-          <p className="dash-subtitle">Generate legal packet artifacts by platform.</p>
+          <p className="item-badge">Evidence Packets</p>
+          <h2 className="dash-title">Evidence Packet Generator</h2>
+          <p className="dash-subtitle">Queue a platform-specific evidence packet for records and executor handoff.</p>
         </div>
       </div>
 
@@ -123,25 +123,25 @@ export function PacketsScreen() {
       {error ? <p className="input-error-msg">{error}</p> : null}
 
       <section className="inventory-panel glass-panel">
-        <h3 className="section-title">Create Packet Job</h3>
+        <h3 className="section-title">Queue Evidence Packet</h3>
         <form className="inventory-form" onSubmit={handleCreate}>
           <Input label="Platform" value={platform} onChange={(event) => setPlatform(event.target.value)} placeholder="e.g. gmail" required />
           <Button type="submit" isLoading={loadingAction === 'create'}>
-            <FileText size={16} /> Queue Packet Job
+            <FileText size={16} /> Queue Evidence Packet
           </Button>
         </form>
       </section>
 
       <section className="inventory-panel glass-panel">
         <div className="inventory-actions-row">
-          <h3 className="section-title">Recent Packet Jobs</h3>
+          <h3 className="section-title">Recent Evidence Packets</h3>
           <Button type="button" variant="ghost" onClick={() => void refreshJobs()}>
             <RefreshCw size={16} /> Refresh
           </Button>
         </div>
 
         {jobs.length === 0 ? (
-          <p className="inventory-empty">No packet jobs yet.</p>
+          <p className="inventory-empty">No evidence packets queued yet.</p>
         ) : (
           <div className="inventory-list">
             {jobs.map((job) => (
@@ -149,7 +149,7 @@ export function PacketsScreen() {
                 <div className="item-meta">
                   <div className="item-badge">{job.platform}</div>
                   <h4>{job.id}</h4>
-                  <p className="item-secondary">Packet generation pipeline</p>
+                  <p className="item-secondary">Platform-specific evidence packet</p>
                 </div>
                 <div className="item-status">
                   <span className={`status-indicator ${job.status === 'ready' ? 'success' : 'warning'}`}>{job.status}</span>

@@ -55,7 +55,7 @@ export function useBillingWorkspace() {
     setLoadingAction('verify');
     setIsVerifying(true);
     setError('');
-    setFeedback('Verifying payment status...');
+    setFeedback('Checking payment status...');
 
     try {
       let latest: PaymentStatusResponse | null = null;
@@ -64,17 +64,17 @@ export function useBillingWorkspace() {
         setPaymentStatus(latest);
 
         if (isTerminalStatus(latest.status)) {
-          setFeedback(`Payment ${latest.status}.`);
+          setFeedback(`Payment status: ${latest.status}.`);
           return latest;
         }
 
         await sleep(2000);
       }
 
-      setFeedback('Verification timed out. You can retry status polling.');
+      setFeedback('Status check timed out. You can retry.');
       return latest;
     } catch (statusError) {
-      setError(readApiErrorMessage(statusError, 'Unable to fetch payment status.'));
+      setError(readApiErrorMessage(statusError, 'Unable to load payment status.'));
       return null;
     } finally {
       setIsVerifying(false);
@@ -108,7 +108,7 @@ export function useBillingWorkspace() {
           amount: created.amount_paise,
           currency: created.currency,
           name: 'Varasaan',
-          description: 'Digital legacy planning checkout',
+          description: 'Varasaan plan payment',
           order_id: created.provider_order_id,
           handler: async () => {
             await pollPaymentStatus(created.order_id);
@@ -116,12 +116,12 @@ export function useBillingWorkspace() {
         });
         instance.open();
       } else {
-        setFeedback('Checkout order created. Razorpay key/script unavailable, so this is API-only mode.');
+        setFeedback('Payment check created. This browser could not open Razorpay automatically, so you can track status from this page.');
       }
 
       return created;
     } catch (checkoutError) {
-      setError(readApiErrorMessage(checkoutError, 'Unable to create checkout order.'));
+      setError(readApiErrorMessage(checkoutError, 'Unable to start payment check.'));
       return null;
     } finally {
       if (!isVerifying) {

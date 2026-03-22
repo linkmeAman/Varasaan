@@ -136,15 +136,15 @@ export function DashboardOverviewClient() {
             <div className="item-meta">
               <div className="item-badge">Contacts</div>
               <h4>Trusted Contacts</h4>
-              <p className="item-secondary">Invite executors and manage recovery assistants.</p>
+              <p className="item-secondary">Designate one executor and keep recovery or packet-access contacts on file.</p>
             </div>
           </Link>
 
           <Link href="/dashboard/documents" className="inventory-item glass-panel">
             <div className="item-meta">
               <div className="item-badge">Documents</div>
-              <h4>Document Vault</h4>
-              <p className="item-secondary">Upload, scan, grant, and download legal documents.</p>
+              <h4>Document Workspace</h4>
+              <p className="item-secondary">Upload, scan, grant, and download planning and legal documents.</p>
             </div>
           </Link>
 
@@ -168,8 +168,8 @@ export function DashboardOverviewClient() {
           <Link href="/dashboard/packets" className="inventory-item glass-panel">
             <div className="item-meta">
               <div className="item-badge">Packets</div>
-              <h4>Generate Packet Jobs</h4>
-              <p className="item-secondary">Start legal packet generation by platform.</p>
+              <h4>Evidence Packets</h4>
+              <p className="item-secondary">Queue platform-specific evidence packets for records or executor handoff.</p>
             </div>
           </Link>
 
@@ -183,9 +183,9 @@ export function DashboardOverviewClient() {
 
           <Link href="/dashboard/billing" className="inventory-item glass-panel">
             <div className="item-meta">
-              <div className="item-badge">Payments</div>
-              <h4>Checkout and Billing</h4>
-              <p className="item-secondary">Create checkout orders and track payment status.</p>
+              <div className="item-badge">Plans</div>
+              <h4>Billing Preview</h4>
+              <p className="item-secondary">Current MVP page validates payments while tiered plans and invoices are still in progress.</p>
             </div>
           </Link>
         </div>

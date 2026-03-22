@@ -16,9 +16,9 @@ export function BillingScreen() {
     <div className="inventory-manager animate-fade-in">
       <div className="inventory-manager-header">
         <div>
-          <p className="item-badge">Billing</p>
-          <h2 className="dash-title">Billing</h2>
-          <p className="dash-subtitle">Create checkout orders and monitor payment status.</p>
+          <p className="item-badge">Plans</p>
+          <h2 className="dash-title">Plans and Billing</h2>
+          <p className="dash-subtitle">This MVP screen validates checkout flow while tiered plans, entitlements, and invoices are still in progress.</p>
         </div>
       </div>
 
@@ -26,18 +26,18 @@ export function BillingScreen() {
       {error ? <p className="input-error-msg">{error}</p> : null}
 
       <section className="inventory-panel glass-panel">
-        <h3 className="section-title">Create Checkout</h3>
+        <h3 className="section-title">Start Payment Check</h3>
         <div className="inventory-actions-row">
           <Input label="Amount (INR)" type="number" min={1} value={amountRupees} onChange={(event) => setAmountRupees(event.target.value)} />
           <Button type="button" onClick={() => void createCheckout(amountRupees)} isLoading={loadingAction === 'checkout'}>
-            <CreditCard size={16} /> Create Order
+            <CreditCard size={16} /> Start Payment Check
           </Button>
         </div>
       </section>
 
       <section className="inventory-panel glass-panel">
         <div className="inventory-actions-row">
-          <h3 className="section-title">Payment Status</h3>
+          <h3 className="section-title">Payment Activity</h3>
           <Button
             type="button"
             variant="ghost"
@@ -54,12 +54,12 @@ export function BillingScreen() {
         </div>
 
         {!checkout ? (
-          <p className="inventory-empty">No checkout created yet.</p>
+          <p className="inventory-empty">No payment check started yet.</p>
         ) : (
           <div className="inventory-list">
             <div className="inventory-item glass-panel">
               <div className="item-meta">
-                <div className="item-badge">order</div>
+                <div className="item-badge">payment check</div>
                 <h4>{checkout.order_id}</h4>
                 <p className="item-secondary">
                   provider: {checkout.provider} / provider_order_id: {checkout.provider_order_id}
@@ -72,7 +72,7 @@ export function BillingScreen() {
             {paymentStatus ? (
               <div className="inventory-item glass-panel">
                 <div className="item-meta">
-                  <div className="item-badge">status</div>
+                  <div className="item-badge">latest status</div>
                   <h4>{paymentStatus.order_id}</h4>
                   <p className="item-secondary">payment_id: {paymentStatus.payment_id || 'pending'}</p>
                 </div>

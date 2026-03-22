@@ -15,8 +15,8 @@ export default function LandingPage() {
           </h1>
 
           <p className="hero-subtitle animate-fade-in" style={{ animationDelay: '200ms' }}>
-            We help families close, recover, and preserve digital life legally, fast, and with proof. Build your
-            encrypted inventory today, so they're never locked out tomorrow.
+            We help families close, recover, and preserve digital life legally, fast, and with proof. Map what
+            exists, name one executor, and leave a clear starting point without storing passwords.
           </p>
 
           <div className="hero-actions animate-fade-in" style={{ animationDelay: '300ms' }}>
@@ -47,16 +47,16 @@ export default function LandingPage() {
             <div className="feature-icon-wrapper">
               <FileCheck size={28} />
             </div>
-            <h3>Legal Closure Packets</h3>
-            <p>Instantly generate pre-filled submission forms customized for 50+ major Indian services and custodians.</p>
+            <h3>Evidence Packet Guidance</h3>
+            <p>Queue platform-specific evidence packets for supported services so families have the right paperwork and proof trail.</p>
           </div>
 
           <div className="feature-card glass-panel">
             <div className="feature-icon-wrapper">
               <Users size={28} />
             </div>
-            <h3>Executor Collaboration</h3>
-            <p>Invite trusted family to a shared dashboard to split tasks and manage the after-loss process with clarity.</p>
+            <h3>Single-Executor Handoff</h3>
+            <p>Designate one executor today and unlock a guided after-loss workspace for that person once a loss is confirmed.</p>
           </div>
         </div>
       </section>
