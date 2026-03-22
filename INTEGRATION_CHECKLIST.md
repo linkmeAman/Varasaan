@@ -18,9 +18,9 @@
 - Preferred local command:
   - `npm run verify:sync`
 - Add phase-specific backend tests when needed:
-  - `npm run verify:sync -- backend/tests/test_api_integration_flows.py`
-  - `npm run verify:sync -- backend/tests/test_api_integration_flows.py backend/tests/test_case_flows.py`
-- Optional Playwright execution still uses the existing frontend e2e commands, and a real runner/staging pass remains required for high-confidence frontend validation.
+  - `npm run verify:sync -- --backend-test backend/tests/test_api_integration_flows.py`
+  - `npm run verify:sync -- --backend-test backend/tests/test_api_integration_flows.py --backend-test backend/tests/test_case_flows.py`
+- Optional Playwright execution remains available through `npm run verify:sync -- --run-e2e --playwright-spec <spec>` or the existing frontend e2e commands, but a real runner/staging pass is still required for high-confidence frontend validation.
 
 ## Per-Phase Verification Checklist
 
@@ -48,7 +48,7 @@
 
 - Baseline hygiene is resolved: `codex/pre-phase-a-baseline` now holds the consolidated pre-Phase-A state and the stream branches were cut from it.
 - Phase A backend is implemented on `codex/phase-a-backend`: PDF metadata stripping, review-state persistence, hidden `/api/v1/internal/case-reviews/*` endpoints, review activity events, and the schema migration are present.
-- Verification passed on this branch with `npm run verify:sync -- backend/tests/test_api_integration_flows.py backend/tests/test_case_flows.py`.
+- Verification passed on this branch with `npm run verify:sync -- --backend-test backend/tests/test_api_integration_flows.py --backend-test backend/tests/test_case_flows.py`.
 - The remaining sync gap is explicit: `packages/shared/openapi/openapi.yaml`, `packages/shared/openapi/openapi.generated.json`, `frontend/src/lib/generated/api-client.ts`, and `frontend/src/api/openapi-types.ts` still need the new public case-summary review fields.
 
 ## Endpoint-by-Endpoint Status

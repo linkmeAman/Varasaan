@@ -13,13 +13,12 @@ const uvCommand = process.platform === "win32" ? "uv.exe" : "uv";
 function printUsage() {
   console.log(`Usage:
   npm run verify:sync
-  npm run verify:sync -- backend/tests/test_api_integration_flows.py
-  npm run verify:sync -- backend/tests/test_api_integration_flows.py backend/tests/test_case_flows.py
-  node ./scripts/ci/verify-sync.mjs --run-e2e --playwright-spec frontend/tests/e2e/executor-flow.spec.ts
+  npm run verify:sync -- --backend-test backend/tests/test_api_integration_flows.py
+  npm run verify:sync -- --backend-test backend/tests/test_api_integration_flows.py --backend-test backend/tests/test_case_flows.py
+  npm run verify:sync -- --run-e2e --playwright-spec frontend/tests/e2e/executor-flow.spec.ts
 
 Options:
-  <path>                    Add a phase-specific backend pytest target.
-  --backend-test <path>     Also accepted when running the script directly.
+  --backend-test <path>     Add a phase-specific backend pytest target.
   --playwright-spec <path>  Run a specific Playwright spec when paired with --run-e2e.
   --run-e2e                 Execute Playwright after contract/backend/frontend verification.
   --help                    Show this help text.`);
@@ -41,10 +40,10 @@ function runStep(label, command, args) {
     console.log(`\n==> ${label}`);
     console.log([command, ...args].join(" "));
 
-    const child = spawn([command, ...args].join(" "), {
+    const child = spawn(command, args, {
       cwd: repoRoot,
       stdio: "inherit",
-      shell: true,
+      shell: false,
     });
 
     child.on("error", reject);
@@ -59,8 +58,8 @@ function runStep(label, command, args) {
 }
 
 const backendTests = [];
-let playwrightSpec = process.env.npm_config_playwright_spec ?? null;
-let runE2E = process.env.npm_config_run_e2e === "true";
+let playwrightSpec = null;
+let runE2E = false;
 
 for (let index = 2; index < process.argv.length; index += 1) {
   const arg = process.argv[index];
@@ -96,12 +95,6 @@ for (let index = 2; index < process.argv.length; index += 1) {
 
   if (arg === "--run-e2e") {
     runE2E = true;
-    continue;
-  }
-
-  if (!arg.startsWith("--")) {
-    ensureExists(arg, "Backend test");
-    backendTests.push(arg);
     continue;
   }
 

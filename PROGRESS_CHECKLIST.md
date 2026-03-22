@@ -115,6 +115,6 @@ Exit gate:
 ## Immediate Next Steps
 
 1. Switch to `codex/phase-a-sync` and update `packages/shared/openapi/openapi.yaml` for the new public case-summary review fields only.
-2. Regenerate `packages/shared/openapi/openapi.generated.json`, `frontend/src/lib/generated/api-client.ts`, and `frontend/src/api/openapi-types.ts`, then rerun `npm run verify:sync -- backend/tests/test_api_integration_flows.py backend/tests/test_case_flows.py`.
+2. Regenerate `packages/shared/openapi/openapi.generated.json`, `frontend/src/lib/generated/api-client.ts`, and `frontend/src/api/openapi-types.ts`, then rerun `npm run verify:sync -- --backend-test backend/tests/test_api_integration_flows.py --backend-test backend/tests/test_case_flows.py`.
 3. Update the four sync-owned docs to mark the public contract synced while keeping `/api/v1/internal/case-reviews/*` out of OpenAPI.
 4. Switch to `codex/phase-a-frontend` and ship executor `pending review` / `rejected review` states, review reason/note display, and replacement upload UX, then move to Phase B checkout completion.
