@@ -1,52 +1,77 @@
 # Digital Legacy Manager - Progress Checklist
 
-This document tracks shipped state plus the standing three-stream delivery model defined in `EXECUTION_PLAN.md`. A phase is complete only when backend, sync/QA/docs, and frontend all land with aligned contract artifacts and docs.
+This checklist tracks repository reality against the current product roadmap and execution documents.
 
-## Shipped Baseline
+Sync sources: status below is derived from the current frontend routes, backend API surface, generated client artifacts, Playwright coverage, and CI workflows.
 
 - [x] Foundation: monorepo structure, CI/CD, async backend, cookie-auth security baseline, and OpenAPI contract sync are in place.
 - [x] Planning mode baseline: auth, inventory, trusted contacts, document uploads, evidence packet/export jobs, heartbeat flows, and the backend Razorpay surface are implemented.
 - [x] After-loss baseline: executor designation, pending/active cases, activation upload flow, task workspace, evidence capture, live closure reporting, case-open notifications, case closure, retention cleanup, and bleed-stopper guidance are implemented.
 - [ ] Planning mode finish: the real checkout UI and staging payment validation are still open.
 
-## Standing Delivery Rules
+## Phase 0 - Foundation
 
-- [x] Streams: `Backend`, `Frontend`, and `Sync / QA / Docs`.
-- [x] Commit order: backend -> sync / QA / docs -> frontend -> optional integration fix.
-- [x] Branch pattern: `codex/<phase>-backend`, `codex/<phase>-sync`, `codex/<phase>-frontend`.
-- [x] Backend owns public interface changes.
-- [x] Frontend consumes only generated client/types.
-- [x] Sync stream owns `PROGRESS_CHECKLIST.md`, `PRODUCT_DEVELOPMENT.md`, `CHANGELOG.md`, and `INTEGRATION_CHECKLIST.md`.
-- [ ] Current tree hygiene: the existing Phase 2.4 bleed-stopper and closure-hardening work still needs an intentional split or squash before the next phase branch set starts.
+Infrastructure, release governance, contract generation, and the base backend stack are in place.
+
+- [x] Project setup: monorepo structure, root/frontend package manifests, backend Python project, and shared OpenAPI artifacts exist.
+- [x] CI/CD pipeline: GitHub workflows enforce `pr-title-lint`, `contract-sync`, `backend-quality`, `frontend-quality`, `infra-validate`, and `critical-path-e2e`.
+- [x] Database schema baseline: core entities, Alembic, and async SQLAlchemy wiring exist.
+- [x] Security baseline: cookie auth, CSRF enforcement, OpenAPI sync, and protected API dependencies exist.
 
 ## Active Phase Queue
 
-### Phase A - After-Loss Hardening Finish (current)
+## Phase 1 - MVP Planning Mode
 
-Target commits:
-- `feat(api): add activation sanitization and review flow`
-- `chore(contract): sync activation review schema and docs`
-- `feat(web): surface activation review states`
+The MVP is partially shipped. The remaining work is now architecture hardening plus the missing heartbeat feature.
 
-Checklist:
-- [ ] Strip death-certificate metadata before activation.
-- [ ] Add risk-based manual review state and internal review endpoints.
-- [ ] Keep the public case lifecycle stable by extending case summary payloads with review metadata.
-- [ ] Add integration coverage for clean activation, queued review, approval, rejection, and replacement upload.
-- [ ] Regenerate public contract/client artifacts without exposing internal review routes.
-- [ ] Add executor UX states for `pending review` and `rejected review`.
-- [ ] Show review reason/note and the replacement-upload path.
+### Backend / API
+
+- [x] Auth and onboarding API: signup, login, email verification, password reset, logout, session refresh, and recovery flows are implemented.
+- [x] Inventory API: create, list, update, and delete account inventory endpoints are implemented.
+- [x] Trusted contacts API: create, invite, accept, list, and revoke endpoints are implemented.
+- [x] Documents API: upload init, scan dispatch, listing, grants, download, and soft delete are implemented.
+- [x] Evidence packet and export API: packet/export job creation and retrieval flows are implemented.
+- [x] Payments API: checkout, webhook processing, and payment status retrieval are implemented.
+- [ ] Heartbeat / dead-man switch: dedicated model, routes, generated contract surface, and worker flow are still missing.
+
+### Frontend / UI
+
+- [x] Auth screens: `/login`, `/register`, and `/recovery` are implemented as MVP flows.
+- [x] Dashboard and inventory UI: `/dashboard` and `/dashboard/inventory` are implemented as MVP routes.
+- [x] Trusted contacts UI: `/dashboard/trusted-contacts` is implemented as an MVP route.
+- [x] Document uploads UI: `/dashboard/documents` is implemented as an MVP route.
+- [x] Payment and checkout UI: `/dashboard/billing` is implemented as an MVP route.
+- [x] Evidence packet and export UI: `/dashboard/packets` and `/dashboard/exports` are implemented as MVP routes.
+
+### E2E / integration status
+
+- [x] Playwright auth flow coverage exists.
+- [x] Playwright recovery flow coverage exists.
+- [x] Playwright workspace coverage exists for inventory, trusted contacts, documents, packets, exports, and billing.
+
+### Current technical debt / hardening focus
+
+- [ ] Replace thin App Router page wrappers that only mount `frontend/src/views/*` with route-owned modules.
+- [ ] Add `frontend/src/app/dashboard/layout.tsx` and dashboard-level loading/error boundaries.
+- [ ] Add `frontend/src/middleware.ts` for protected-route cookie checks.
+- [ ] Replace the standalone auth guard pattern with a shared auth provider and hook.
+- [ ] Upgrade inventory, document upload, and billing flows from MVP behavior to hardened UX patterns.
+- [ ] Re-run local frontend/backend verification after dependency bootstrap so current status is backed by fresh execution, not only checked-in code.
 
 Exit gate:
 - [ ] Every activation ends in exactly one of `active`, `pending review`, or `rejected review`.
 - [ ] No manual DB intervention is required.
 
-### Phase B - Payment & Checkout Finish (next)
+## Phase 2 - After-Loss Mode
 
-Target commits:
-- Optional backend only if needed: `feat(api): complete payment support surface`
-- `chore(contract): sync payment artifacts and docs`
-- `feat(web): ship checkout and payment verification flow`
+This phase remains pending and should not be started until Phase 1 architecture hardening and heartbeat are complete.
+
+- [ ] Case activation flow
+- [ ] Task management / Kanban
+- [ ] Evidence and proof capture
+- [ ] Subscription bleeding stopper
+- [ ] Family workspace
+- [ ] Crypto inheritance kit
 
 Checklist:
 - [ ] Build the real checkout flow for paid tiers.
@@ -55,60 +80,17 @@ Checklist:
 - [ ] Sync contract/client artifacts only if payment payloads change.
 - [ ] Complete staging validation with a real paid order.
 
-Exit gate:
-- [ ] A real paid order in staging unlocks the intended UI.
+## Phase 3 and 4 - Future Roadmap
+
+- [ ] B2B APIs and white-labeling
+- [ ] React Native mobile app
+- [ ] Analytics and observability expansion
+- [ ] AI-assisted letter drafting and regional language support
 
 ### Phase C - Family Workspace
 
-Target commits:
-- `feat(api): add case collaboration and assignment`
-- `chore(contract): sync collaboration artifacts and docs`
-- `feat(web): add family workspace collaboration`
-
-Checklist:
-- [ ] Expand case participants beyond a single executor.
-- [ ] Add task assignment, comment threads, and participant-aware activity logging.
-- [ ] Add task-status email notifications.
-- [ ] Regenerate contract/client artifacts and update docs.
-- [ ] Add participant panel, assignment UI, comments, and richer activity feed.
-
-Exit gate:
-- [ ] Multiple participants can collaborate on one active case with assignment, comments, notifications, and audit visibility.
-
-### Phase D - Crypto Inheritance Kit
-
-Target commits:
-- `feat(api): add crypto inheritance kit`
-- `chore(contract): sync crypto artifacts and docs`
-- `feat(web): add crypto planning and executor guidance`
-
-Checklist:
-- [ ] Add planning-mode crypto asset models.
-- [ ] Snapshot crypto planning data into case-time records at activation.
-- [ ] Add executor crypto guidance payloads and UI.
-- [ ] Regenerate contract/client artifacts and update docs.
-
-Exit gate:
-- [ ] Crypto planning snapshots into after-loss mode without storing secrets.
-
-### Phase E - B2B / Scale Foundations
-
-Target commits:
-- `feat(api): add multi-tenant partner foundations`
-- `chore(contract): sync b2b artifacts and docs`
-- `feat(web): add partner admin surfaces`
-
-Checklist:
-- [ ] Add org/tenant models, partner webhooks, usage reporting, and tenant-safe auth boundaries.
-- [ ] Sync webhook and B2B contract artifacts plus launch docs.
-- [ ] Add tenant admin surfaces, branding controls, and usage dashboards.
-
-Exit gate:
-- [ ] One pilot tenant operates on isolated data with signed webhook integration.
-
 ## Immediate Next Steps
 
-1. Intentionally split or squash the already-mixed Phase 2.4 and closure-hardening work before opening the next set of stream branches.
-2. Land Phase A backend work first so the review-state contract is stable before any generated-client or frontend changes.
-3. Land the Phase A sync commit second: update `openapi.yaml`, regenerate artifacts, run sync verification, and update the four owned docs.
-4. Start the Phase A frontend work only after the sync commit is available, then move directly to Phase B checkout completion.
+1. Frontend architecture hardening: add dashboard layout/middleware/auth-provider structure and migrate route ownership away from the legacy `src/views` pattern.
+2. Heartbeat implementation: add the missing backend model, route surface, worker flow, generated types, and a basic dashboard UI.
+3. Verification parity: complete dependency bootstrap locally and rerun lint, typecheck, pytest, and Playwright so repository status is confirmed by fresh execution.
