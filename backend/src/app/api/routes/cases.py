@@ -5,12 +5,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import db_session_dep, get_current_user, get_request_id
 from app.core.config import get_settings
-from app.models import Case, CaseTask, CaseTaskStatus, DocumentState, MalwareScanStatus, User
+from app.models import Case, CaseStatus, CaseTask, CaseTaskStatus, DocumentState, MalwareScanStatus, User
 from app.schemas.cases import (
     CaseActivationConfirmRequest,
     CaseActivationUploadInitRequest,
     CaseActivationUploadInitResponse,
     CaseActivityEventResponse,
+    CaseBleedStopperResponse,
     CaseReportResponse,
     CaseSummaryResponse,
     CaseTaskEvidenceResponse,
@@ -51,6 +52,7 @@ async def _serialize_case_summary(db: AsyncSession, case: Case) -> CaseSummaryRe
         death_certificate_version_id=case.death_certificate_version_id,
         activated_at=case.activated_at,
         closed_at=case.closed_at,
+        evidence_retention_expires_at=case.evidence_retention_expires_at,
         created_at=case.created_at,
         updated_at=case.updated_at,
         task_count=task_count,
@@ -66,6 +68,10 @@ def _serialize_case_task(task: CaseTask, *, evidence_count: int) -> CaseTaskResp
         platform=task.platform,
         category=task.category,
         priority=task.priority,
+        is_recurring_payment=task.is_recurring_payment,
+        payment_rail=task.payment_rail,
+        monthly_amount_paise=task.monthly_amount_paise,
+        payment_reference_hint=task.payment_reference_hint,
         status=task.status,
         notes=task.notes,
         reference_number=task.reference_number,
@@ -175,6 +181,25 @@ async def activate_case(
     return await _serialize_case_summary(db, activated_case)
 
 
+@router.post("/{case_id}/close", response_model=CaseSummaryResponse)
+async def close_case(
+    case_id: str,
+    request: Request,
+    request_id: str | None = Depends(get_request_id),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(db_session_dep),
+) -> CaseSummaryResponse:
+    case = await case_service.get_accessible_case(db, case_id=case_id, user_email=user.email)
+    closed_case = await case_service.close_case(
+        db,
+        case=case,
+        actor_id=user.id,
+        request_id=request_id,
+        client_ip=request.client.host if request.client else None,
+    )
+    return await _serialize_case_summary(db, closed_case)
+
+
 @router.get("/{case_id}/tasks", response_model=list[CaseTaskResponse])
 async def list_case_tasks(
     case_id: str,
@@ -209,6 +234,8 @@ async def patch_case_task(
     db: AsyncSession = Depends(db_session_dep),
 ) -> CaseTaskResponse:
     case = await case_service.get_accessible_case(db, case_id=case_id, user_email=user.email)
+    if case.status != CaseStatus.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Task updates are available only for active cases")
     task = await case_service.patch_case_task(
         db,
         case_id=case.id,
@@ -359,3 +386,13 @@ async def get_case_report(
         request_id=request_id,
         client_ip=request.client.host if request.client else None,
     )
+
+
+@router.get("/{case_id}/bleed-stopper", response_model=CaseBleedStopperResponse)
+async def get_case_bleed_stopper(
+    case_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(db_session_dep),
+) -> CaseBleedStopperResponse:
+    case = await case_service.get_accessible_case(db, case_id=case_id, user_email=user.email)
+    return await case_service.build_case_bleed_stopper(db, case=case)

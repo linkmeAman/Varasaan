@@ -121,6 +121,12 @@ class CaseTaskStatus(StrEnum):
     ESCALATED = "escalated"
 
 
+class RecurringPaymentRail(StrEnum):
+    CARD = "card"
+    UPI_AUTOPAY = "upi_autopay"
+    OTHER = "other"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -234,6 +240,7 @@ class Case(Base):
     )
     activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    evidence_retention_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -263,6 +270,10 @@ class CaseTask(Base):
     platform: Mapped[str] = mapped_column(String(120), nullable=False)
     category: Mapped[str] = mapped_column(String(80), nullable=False)
     priority: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_recurring_payment: Mapped[bool] = mapped_column(Boolean, default=False)
+    payment_rail: Mapped[RecurringPaymentRail | None] = mapped_column(Enum(RecurringPaymentRail), nullable=True)
+    monthly_amount_paise: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payment_reference_hint: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[CaseTaskStatus] = mapped_column(Enum(CaseTaskStatus), default=CaseTaskStatus.NOT_STARTED, index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     reference_number: Mapped[str | None] = mapped_column(String(120), nullable=True)
@@ -283,6 +294,8 @@ class CaseTaskEvidence(Base):
     document_id: Mapped[str] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    retention_purge_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    retention_purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -308,6 +321,10 @@ class InventoryAccount(Base):
     category: Mapped[str] = mapped_column(String(80), nullable=False)
     username_hint: Mapped[str | None] = mapped_column(String(255), nullable=True)
     importance_level: Mapped[int] = mapped_column(Integer, default=2)
+    is_recurring_payment: Mapped[bool] = mapped_column(Boolean, default=False)
+    payment_rail: Mapped[RecurringPaymentRail | None] = mapped_column(Enum(RecurringPaymentRail), nullable=True)
+    monthly_amount_paise: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payment_reference_hint: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

@@ -1,63 +1,114 @@
-# 📊 Digital Legacy Manager — Progress & Next Steps Checklist
+# Digital Legacy Manager - Progress Checklist
 
-This document tracks the actual implementation progress against the `PRODUCT_DEVELOPMENT.md` roadmap. It serves as your daily dashboard for what has been completed and what to tackle next.
+This document tracks shipped state plus the standing three-stream delivery model defined in `EXECUTION_PLAN.md`. A phase is complete only when backend, sync/QA/docs, and frontend all land with aligned contract artifacts and docs.
 
----
+## Shipped Baseline
 
-## 🟢 Phase 0 — Foundation (Completed)
-*Infrastructure, compliance, and basic backend setup are functionally complete based on the integration checklists.*
+- [x] Foundation: monorepo structure, CI/CD, async backend, cookie-auth security baseline, and OpenAPI contract sync are in place.
+- [x] Planning mode baseline: auth, inventory, trusted contacts, document uploads, evidence packet/export jobs, heartbeat flows, and the backend Razorpay surface are implemented.
+- [x] After-loss baseline: executor designation, pending/active cases, activation upload flow, task workspace, evidence capture, live closure reporting, case-open notifications, case closure, retention cleanup, and bleed-stopper guidance are implemented.
+- [ ] Planning mode finish: the real checkout UI and staging payment validation are still open.
 
-- [x] **Project Setup**: Monorepo structure (`frontend`, `backend`, `packages`), tooling (`uv`, Ruff, pre-commit) configured.
-- [x] **CI/CD Pipeline**: GitHub workflows, required checks (`contract-sync`, `pr-title-lint`, `backend-quality`), and environments (`staging`, `prod`) are active.
-- [x] **Database Schema**: Core tables implemented and integrated.
-- [x] **Security Baseline**: JWT/Cookies flow, double-submit CSRF, OpenAPI contract sync established.
+## Standing Delivery Rules
 
----
+- [x] Streams: `Backend`, `Frontend`, and `Sync / QA / Docs`.
+- [x] Commit order: backend -> sync / QA / docs -> frontend -> optional integration fix.
+- [x] Branch pattern: `codex/<phase>-backend`, `codex/<phase>-sync`, `codex/<phase>-frontend`.
+- [x] Backend owns public interface changes.
+- [x] Frontend consumes only generated client/types.
+- [x] Sync stream owns `PROGRESS_CHECKLIST.md`, `PRODUCT_DEVELOPMENT.md`, `CHANGELOG.md`, and `INTEGRATION_CHECKLIST.md`.
+- [ ] Current tree hygiene: the existing Phase 2.4 bleed-stopper and closure-hardening work still needs an intentional split or squash before the next phase branch set starts.
 
-## 🟡 Phase 1 — MVP: Planning Mode (In Progress)
-*Core planning-mode frontend surfaces are now in place. The primary focus is closing out the remaining payment and heartbeat gaps.*
+## Active Phase Queue
 
-### Backend / API (Mostly Complete)
-- [x] **Auth + Onboarding**: Signup, login, email verification, password reset APIs are synced.
-- [x] **Account Inventory Builder**: Accounts API endpoints are synced.
-- [x] **Trusted Contacts**: Invite, accept, list, and revoke APIs are synced.
-- [x] **Evidence Packet Generator**: Job creation and retrieval APIs (exports & packets) are synced.
-- [x] **Payment Integration**: Razorpay checkout and webhook APIs are synced.
-- [x] **Document Management**: Uploads init, grants, and scan queue APIs are synced.
-- [ ] **Heartbeat / Dead-Man Switch**: Cron jobs and related endpoints for the heartbeat ping and escalation reminders.
+### Phase A - After-Loss Hardening Finish (current)
 
-### Frontend / UI (Current Focus)
-- [x] **Auth Flow Screens**: Login, Registration, Password Reset UI.
-- [x] **Dashboard / Inventory Builder**: UI to add/manage inventory accounts and account details.
-- [x] **Trusted Contacts UI**: Screens to invite executors and setup relationships.
-- [ ] **Payment & Checkout UI**: Razorpay frontend integration for Essential/Executor tiers.
-- [x] **Document Uploads UI**: Owner document vault uploads plus executor death-certificate activation upload.
+Target commits:
+- `feat(api): add activation sanitization and review flow`
+- `chore(contract): sync activation review schema and docs`
+- `feat(web): surface activation review states`
 
----
+Checklist:
+- [ ] Strip death-certificate metadata before activation.
+- [ ] Add risk-based manual review state and internal review endpoints.
+- [ ] Keep the public case lifecycle stable by extending case summary payloads with review metadata.
+- [ ] Add integration coverage for clean activation, queued review, approval, rejection, and replacement upload.
+- [ ] Regenerate public contract/client artifacts without exposing internal review routes.
+- [ ] Add executor UX states for `pending review` and `rejected review`.
+- [ ] Show review reason/note and the replacement-upload path.
 
-## 🟠 Phase 2 — After-Loss Mode (In Progress)
-*The first Phase 2.1 / 2.2 slice is now implemented for a single executor per owner via trusted contacts. The remaining items below stay out of scope for this slice.*
+Exit gate:
+- [ ] Every activation ends in exactly one of `active`, `pending review`, or `rejected review`.
+- [ ] No manual DB intervention is required.
 
-- [x] **Executor Designation + Pending Cases**: Owners can assign an `executor` role in trusted contacts, and accepted executors can see pending or active cases.
-- [x] **Case Activation Flow (V1)**: Executor-only pending case visibility, case-scoped death-certificate upload, PDF / 10 MB validation, and idempotent activation.
-- [x] **Task Management / Kanban (V1)**: One task per inventory account, stable snapshot generation at activation, board/list filters, and editable notes/status/reference/submitted date.
-- [ ] **Evidence & Proof Capture** (Uploading completion states)
-- [ ] **Subscription Bleeding Stopper** (Cancellation checklists)
-- [ ] **Family Workspace** (Collaboration threads and assignment)
-- [ ] **Crypto Inheritance Kit** 
+### Phase B - Payment & Checkout Finish (next)
 
----
+Target commits:
+- Optional backend only if needed: `feat(api): complete payment support surface`
+- `chore(contract): sync payment artifacts and docs`
+- `feat(web): ship checkout and payment verification flow`
 
-## 🔮 Phase 3 & 4 (Future Roadmap)
-- [ ] B2B APIs & White-labeling
-- [ ] React Native Mobile App
-- [ ] Analytics & Observability
-- [ ] AI-assisted letter drafting & Regional languages
+Checklist:
+- [ ] Build the real checkout flow for paid tiers.
+- [ ] Add Razorpay status polling plus success, failure, and retry states.
+- [ ] Refresh entitlements after payment success.
+- [ ] Sync contract/client artifacts only if payment payloads change.
+- [ ] Complete staging validation with a real paid order.
 
----
+Exit gate:
+- [ ] A real paid order in staging unlocks the intended UI.
 
-## 🚀 Immediate Next Steps (What to do today)
+### Phase C - Family Workspace
 
-1. **Heartbeat System Backend**: Implement the background job (Celery/Postgres) and endpoints for the heartbeat/dead-man switch mechanism.
-2. **Payment & Checkout Finish**: Complete the remaining frontend payment flow and staging validation.
-3. **Finish the remaining Phase 2 work**: evidence uploads, manual review, notifications, multi-participant collaboration, and closure reporting.
+Target commits:
+- `feat(api): add case collaboration and assignment`
+- `chore(contract): sync collaboration artifacts and docs`
+- `feat(web): add family workspace collaboration`
+
+Checklist:
+- [ ] Expand case participants beyond a single executor.
+- [ ] Add task assignment, comment threads, and participant-aware activity logging.
+- [ ] Add task-status email notifications.
+- [ ] Regenerate contract/client artifacts and update docs.
+- [ ] Add participant panel, assignment UI, comments, and richer activity feed.
+
+Exit gate:
+- [ ] Multiple participants can collaborate on one active case with assignment, comments, notifications, and audit visibility.
+
+### Phase D - Crypto Inheritance Kit
+
+Target commits:
+- `feat(api): add crypto inheritance kit`
+- `chore(contract): sync crypto artifacts and docs`
+- `feat(web): add crypto planning and executor guidance`
+
+Checklist:
+- [ ] Add planning-mode crypto asset models.
+- [ ] Snapshot crypto planning data into case-time records at activation.
+- [ ] Add executor crypto guidance payloads and UI.
+- [ ] Regenerate contract/client artifacts and update docs.
+
+Exit gate:
+- [ ] Crypto planning snapshots into after-loss mode without storing secrets.
+
+### Phase E - B2B / Scale Foundations
+
+Target commits:
+- `feat(api): add multi-tenant partner foundations`
+- `chore(contract): sync b2b artifacts and docs`
+- `feat(web): add partner admin surfaces`
+
+Checklist:
+- [ ] Add org/tenant models, partner webhooks, usage reporting, and tenant-safe auth boundaries.
+- [ ] Sync webhook and B2B contract artifacts plus launch docs.
+- [ ] Add tenant admin surfaces, branding controls, and usage dashboards.
+
+Exit gate:
+- [ ] One pilot tenant operates on isolated data with signed webhook integration.
+
+## Immediate Next Steps
+
+1. Intentionally split or squash the already-mixed Phase 2.4 and closure-hardening work before opening the next set of stream branches.
+2. Land Phase A backend work first so the review-state contract is stable before any generated-client or frontend changes.
+3. Land the Phase A sync commit second: update `openapi.yaml`, regenerate artifacts, run sync verification, and update the four owned docs.
+4. Start the Phase A frontend work only after the sync commit is available, then move directly to Phase B checkout completion.

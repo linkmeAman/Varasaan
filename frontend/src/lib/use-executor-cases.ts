@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import {
   apiClient,
   type CaseActivityEventResponse,
+  type CaseBleedStopperResponse,
+  type CaseBleedStopperRowResponse,
   type CaseReportResponse,
   type CaseSummaryResponse,
   type CaseTaskEvidenceResponse,
@@ -28,6 +30,7 @@ export const EXECUTOR_TASK_STATUSES: CaseTaskStatus[] = [
   'resolved',
   'escalated',
 ];
+const EXECUTOR_TERMINAL_TASK_STATUSES = new Set<CaseTaskStatus>(['resolved', 'escalated']);
 
 export type ExecutorTaskFilters = {
   status: 'all' | CaseTaskStatus;
@@ -119,6 +122,23 @@ export function getExecutorEvidenceStatusLabel(evidence: CaseTaskEvidenceRespons
       return 'Pending scan';
     default:
       return evidence.document_state.replaceAll('_', ' ');
+  }
+}
+
+export function isExecutorTaskTerminal(status: CaseTaskStatus): boolean {
+  return EXECUTOR_TERMINAL_TASK_STATUSES.has(status);
+}
+
+export function getExecutorBleedStopperActionLabel(actionType: CaseBleedStopperRowResponse['action_type']): string {
+  switch (actionType) {
+    case 'card_dispute':
+      return 'Cancel card mandate and dispute debits';
+    case 'revoke_upi_autopay':
+      return 'Revoke UPI autopay mandate';
+    case 'cancel_recurring_payment':
+      return 'Cancel recurring payment';
+    default:
+      return actionType;
   }
 }
 
@@ -280,10 +300,12 @@ export function useExecutorCase(caseId: string) {
   const [caseSummary, setCaseSummary] = useState<CaseSummaryResponse | null>(null);
   const [tasks, setTasks] = useState<CaseTaskResponse[]>([]);
   const [activity, setActivity] = useState<CaseActivityEventResponse[]>([]);
+  const [bleedStopper, setBleedStopper] = useState<CaseBleedStopperResponse | null>(null);
   const [evidenceByTask, setEvidenceByTask] = useState<Record<string, CaseTaskEvidenceResponse[]>>({});
   const [isLoadingCase, setIsLoadingCase] = useState(true);
   const [isLoadingTasks, setIsLoadingTasks] = useState(true);
   const [isLoadingActivity, setIsLoadingActivity] = useState(true);
+  const [isLoadingBleedStopper, setIsLoadingBleedStopper] = useState(true);
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
   const [loadingAction, setLoadingAction] = useState('');
@@ -377,6 +399,36 @@ export function useExecutorCase(caseId: string) {
     }
   };
 
+  const refreshBleedStopper = async (options?: { background?: boolean }) => {
+    if (!user) {
+      return null;
+    }
+
+    if (!options?.background) {
+      setIsLoadingBleedStopper(true);
+      setError('');
+    }
+
+    try {
+      const summary = caseSummary ?? (await apiClient.getCaseSummary({ caseId }));
+      if (summary.status !== 'active') {
+        setBleedStopper(null);
+        return null;
+      }
+
+      const nextBleedStopper = await apiClient.getCaseBleedStopper({ caseId });
+      setBleedStopper(nextBleedStopper);
+      return nextBleedStopper;
+    } catch (loadError) {
+      setError(readApiErrorMessage(loadError, 'Unable to load the subscription bleed stopper.'));
+      return null;
+    } finally {
+      if (!options?.background) {
+        setIsLoadingBleedStopper(false);
+      }
+    }
+  };
+
   useEffect(() => {
     if (!user || !caseId) {
       return;
@@ -388,6 +440,7 @@ export function useExecutorCase(caseId: string) {
       setIsLoadingCase(true);
       setIsLoadingTasks(true);
       setIsLoadingActivity(true);
+      setIsLoadingBleedStopper(true);
       setError('');
 
       try {
@@ -396,12 +449,14 @@ export function useExecutorCase(caseId: string) {
           apiClient.listCaseTasks({ caseId }),
           apiClient.getCaseActivity({ caseId }),
         ]);
+        const nextBleedStopper = summary.status === 'active' ? await apiClient.getCaseBleedStopper({ caseId }) : null;
         if (!active) {
           return;
         }
         setCaseSummary(summary);
         setTasks(listedTasks);
         setActivity(events);
+        setBleedStopper(nextBleedStopper);
       } catch (loadError) {
         if (!active) {
           return;
@@ -412,6 +467,7 @@ export function useExecutorCase(caseId: string) {
           setIsLoadingCase(false);
           setIsLoadingTasks(false);
           setIsLoadingActivity(false);
+          setIsLoadingBleedStopper(false);
         }
       }
     };
@@ -491,7 +547,11 @@ export function useExecutorCase(caseId: string) {
       });
 
       setTasks((current) => current.map((task) => (task.id === taskId ? updatedTask : task)));
-      await Promise.all([refreshCaseSummary({ background: true }), refreshActivity({ background: true })]);
+      await Promise.all([
+        refreshCaseSummary({ background: true }),
+        refreshActivity({ background: true }),
+        refreshBleedStopper({ background: true }),
+      ]);
       setFeedback('Task updated.');
       return updatedTask;
     } catch (updateError) {
@@ -602,11 +662,13 @@ export function useExecutorCase(caseId: string) {
     caseSummary,
     tasks,
     activity,
+    bleedStopper,
     evidenceByTask,
     filters,
     isLoadingCase,
     isLoadingTasks,
     isLoadingActivity,
+    isLoadingBleedStopper,
     feedback,
     error,
     loadingAction,
@@ -617,10 +679,82 @@ export function useExecutorCase(caseId: string) {
     refreshCaseSummary,
     refreshTasks,
     refreshActivity,
+    refreshBleedStopper,
     refreshEvidence,
     updateTask,
     uploadTaskEvidence,
     downloadTaskEvidence,
+  };
+}
+
+export function useExecutorCaseBleedStopper(caseId: string) {
+  const { user } = useAuth();
+
+  const [bleedStopper, setBleedStopper] = useState<CaseBleedStopperResponse | null>(null);
+  const [isLoadingBleedStopper, setIsLoadingBleedStopper] = useState(true);
+  const [error, setError] = useState('');
+
+  const refreshBleedStopper = async () => {
+    if (!user) {
+      return null;
+    }
+
+    setIsLoadingBleedStopper(true);
+    setError('');
+
+    try {
+      const nextBleedStopper = await apiClient.getCaseBleedStopper({ caseId });
+      setBleedStopper(nextBleedStopper);
+      return nextBleedStopper;
+    } catch (loadError) {
+      setError(readApiErrorMessage(loadError, 'Unable to load the subscription bleed stopper.'));
+      return null;
+    } finally {
+      setIsLoadingBleedStopper(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user || !caseId) {
+      return;
+    }
+
+    let active = true;
+
+    const loadBleedStopper = async () => {
+      setIsLoadingBleedStopper(true);
+      setError('');
+
+      try {
+        const nextBleedStopper = await apiClient.getCaseBleedStopper({ caseId });
+        if (!active) {
+          return;
+        }
+        setBleedStopper(nextBleedStopper);
+      } catch (loadError) {
+        if (!active) {
+          return;
+        }
+        setError(readApiErrorMessage(loadError, 'Unable to load the subscription bleed stopper.'));
+      } finally {
+        if (active) {
+          setIsLoadingBleedStopper(false);
+        }
+      }
+    };
+
+    void loadBleedStopper();
+
+    return () => {
+      active = false;
+    };
+  }, [user, caseId]);
+
+  return {
+    bleedStopper,
+    isLoadingBleedStopper,
+    error,
+    refreshBleedStopper,
   };
 }
 
@@ -630,6 +764,8 @@ export function useExecutorCaseReport(caseId: string) {
   const [report, setReport] = useState<CaseReportResponse | null>(null);
   const [isLoadingReport, setIsLoadingReport] = useState(true);
   const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [loadingAction, setLoadingAction] = useState('');
 
   const refreshReport = async () => {
     if (!user) {
@@ -687,10 +823,40 @@ export function useExecutorCaseReport(caseId: string) {
     };
   }, [user, caseId]);
 
+  const closeCase = async () => {
+    if (!user) {
+      return null;
+    }
+
+    if (report?.summary.status === 'closed') {
+      return report;
+    }
+
+    setLoadingAction('close-case');
+    setError('');
+    setFeedback('');
+
+    try {
+      await apiClient.closeCase({ caseId });
+      const nextReport = await apiClient.getCaseReport({ caseId });
+      setReport(nextReport);
+      setFeedback('Case closed and evidence retention scheduled.');
+      return nextReport;
+    } catch (closeError) {
+      setError(readApiErrorMessage(closeError, 'Unable to close this case.'));
+      return null;
+    } finally {
+      setLoadingAction('');
+    }
+  };
+
   return {
     report,
     isLoadingReport,
     error,
+    feedback,
+    loadingAction,
     refreshReport,
+    closeCase,
   };
 }

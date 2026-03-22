@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.models import CaseStatus, CaseTaskStatus
+from app.models import CaseStatus, CaseTaskStatus, RecurringPaymentRail
 
 DEATH_CERTIFICATE_CONTENT_TYPE = "application/pdf"
 DEATH_CERTIFICATE_DOC_TYPE = "death_certificate"
@@ -37,6 +37,7 @@ class CaseSummaryResponse(BaseModel):
     death_certificate_version_id: str | None = None
     activated_at: datetime | None = None
     closed_at: datetime | None = None
+    evidence_retention_expires_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     task_count: int
@@ -73,6 +74,10 @@ class CaseTaskResponse(BaseModel):
     platform: str
     category: str
     priority: int
+    is_recurring_payment: bool = False
+    payment_rail: RecurringPaymentRail | None = None
+    monthly_amount_paise: int | None = None
+    payment_reference_hint: str | None = None
     status: CaseTaskStatus
     notes: str | None = None
     reference_number: str | None = None
@@ -137,6 +142,8 @@ class CaseReportSummaryResponse(BaseModel):
     owner_email: str
     status: CaseStatus
     activated_at: datetime | None = None
+    closed_at: datetime | None = None
+    evidence_retention_expires_at: datetime | None = None
     generated_at: datetime
     total_tasks: int
     resolved_task_count: int
@@ -174,3 +181,35 @@ class CaseReportResponse(BaseModel):
     activity_timeline: list[CaseActivityEventResponse]
     report_ready: bool
     warnings: list[str]
+
+
+CaseBleedStopperActionType = Literal["card_dispute", "revoke_upi_autopay", "cancel_recurring_payment"]
+
+
+class CaseBleedStopperCaseSummaryResponse(BaseModel):
+    id: str
+    owner_name: str
+    owner_email: str
+    status: CaseStatus
+    activated_at: datetime | None = None
+
+
+class CaseBleedStopperRowResponse(BaseModel):
+    task_id: str
+    platform: str
+    category: str
+    priority: int
+    status: CaseTaskStatus
+    monthly_amount_paise: int
+    payment_rail: RecurringPaymentRail
+    payment_reference_hint: str | None = None
+    action_type: CaseBleedStopperActionType
+    action_steps: list[str]
+    letter_template: str | None = None
+
+
+class CaseBleedStopperResponse(BaseModel):
+    summary: CaseBleedStopperCaseSummaryResponse
+    monthly_bleed_paise: int
+    recurring_task_count: int
+    rows: list[CaseBleedStopperRowResponse]

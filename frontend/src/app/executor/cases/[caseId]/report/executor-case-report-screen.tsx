@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Printer } from 'lucide-react';
+import { ArrowLeft, Lock, Printer } from 'lucide-react';
 
 import { Button } from '../../../../../components/ui/Button';
 import {
@@ -17,7 +17,7 @@ type ExecutorCaseReportScreenProps = {
 
 export function ExecutorCaseReportScreen({ caseId }: ExecutorCaseReportScreenProps) {
   const router = useRouter();
-  const { report, isLoadingReport, error } = useExecutorCaseReport(caseId);
+  const { report, isLoadingReport, error, feedback, loadingAction, closeCase } = useExecutorCaseReport(caseId);
 
   if (isLoadingReport) {
     return (
@@ -54,11 +54,25 @@ export function ExecutorCaseReportScreen({ caseId }: ExecutorCaseReportScreenPro
           <Button type="button" variant="ghost" onClick={() => router.push(`/executor/cases/${caseId}`)}>
             <ArrowLeft size={16} /> Back to Workspace
           </Button>
+          {report.summary.status !== 'closed' ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void closeCase()}
+              isLoading={loadingAction === 'close-case'}
+              disabled={!report.report_ready || report.warnings.length > 0}
+            >
+              <Lock size={16} /> Close Case
+            </Button>
+          ) : null}
           <Button type="button" onClick={() => window.print()}>
             <Printer size={16} /> Print / Save as PDF
           </Button>
         </div>
       </header>
+
+      {feedback ? <p className="inventory-feedback">{feedback}</p> : null}
+      {error ? <p className="input-error-msg">{error}</p> : null}
 
       <section className="inventory-panel glass-panel executor-section report-summary-grid">
         <div className="report-summary-card">
@@ -77,6 +91,10 @@ export function ExecutorCaseReportScreen({ caseId }: ExecutorCaseReportScreenPro
           <span>Clean evidence</span>
           <strong>{report.summary.clean_evidence_count}</strong>
         </div>
+        <div className="report-summary-card">
+          <span>Retention until</span>
+          <strong>{formatExecutorTimestamp(report.summary.evidence_retention_expires_at)}</strong>
+        </div>
       </section>
 
       <section className="inventory-panel glass-panel executor-section">
@@ -90,6 +108,11 @@ export function ExecutorCaseReportScreen({ caseId }: ExecutorCaseReportScreenPro
           <p className="item-secondary">
             Case status: {getExecutorStatusLabel(report.summary.status)}. Task completion is tracked from the live board and only clean evidence references are included below.
           </p>
+          {report.summary.status === 'closed' ? (
+            <p className="item-secondary">
+              Closed on {formatExecutorDate(report.summary.closed_at)}. Retained evidence is scheduled for cleanup on {formatExecutorDate(report.summary.evidence_retention_expires_at)}.
+            </p>
+          ) : null}
         </div>
         {report.warnings.length > 0 ? (
           <div className="executor-report-warning-list">
@@ -204,6 +227,9 @@ export function ExecutorCaseReportScreen({ caseId }: ExecutorCaseReportScreenPro
           <p className="item-secondary">
             Use the browser print dialog to save this live report as PDF. Generated on {formatExecutorDate(report.summary.generated_at)} with current board state, clean evidence references, and case activity.
           </p>
+          {report.summary.status !== 'closed' && (!report.report_ready || report.warnings.length > 0) ? (
+            <p className="item-secondary">Closing stays disabled until every task is terminal and each task has clean evidence available.</p>
+          ) : null}
         </div>
       </section>
     </div>

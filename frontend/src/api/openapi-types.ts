@@ -1638,6 +1638,45 @@ export const openApiDocument = {
         }
       }
     },
+    "/api/v1/cases/{caseId}/close": {
+      "post": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "closeCase",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Case closed and evidence retention scheduled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseSummaryResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
     "/api/v1/cases/{caseId}/tasks": {
       "get": {
         "tags": [
@@ -1757,6 +1796,9 @@ export const openApiDocument = {
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           }
         }
       }
@@ -2019,6 +2061,45 @@ export const openApiDocument = {
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{caseId}/bleed-stopper": {
+      "get": {
+        "tags": [
+          "cases"
+        ],
+        "operationId": "getCaseBleedStopper",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CaseId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Printable subscription bleed stopper data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseBleedStopperResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           }
         }
       }
@@ -3255,6 +3336,14 @@ export const openApiDocument = {
           "escalated"
         ]
       },
+      "RecurringPaymentRail": {
+        "type": "string",
+        "enum": [
+          "card",
+          "upi_autopay",
+          "other"
+        ]
+      },
       "CaseTaskStatusCounts": {
         "type": "object",
         "required": [
@@ -3340,6 +3429,11 @@ export const openApiDocument = {
             "nullable": true
           },
           "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "evidence_retention_expires_at": {
             "type": "string",
             "format": "date-time",
             "nullable": true
@@ -3484,6 +3578,26 @@ export const openApiDocument = {
           },
           "priority": {
             "type": "integer"
+          },
+          "is_recurring_payment": {
+            "type": "boolean",
+            "default": false
+          },
+          "payment_rail": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RecurringPaymentRail"
+              }
+            ],
+            "nullable": true
+          },
+          "monthly_amount_paise": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payment_reference_hint": {
+            "type": "string",
+            "nullable": true
           },
           "status": {
             "$ref": "#/components/schemas/CaseTaskStatus"
@@ -3743,6 +3857,16 @@ export const openApiDocument = {
             "format": "date-time",
             "nullable": true
           },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "evidence_retention_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "generated_at": {
             "type": "string",
             "format": "date-time"
@@ -3891,6 +4015,122 @@ export const openApiDocument = {
           }
         }
       },
+      "CaseBleedStopperCaseSummaryResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "owner_name",
+          "owner_email",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "owner_name": {
+            "type": "string"
+          },
+          "owner_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CaseStatus"
+          },
+          "activated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "CaseBleedStopperRowResponse": {
+        "type": "object",
+        "required": [
+          "task_id",
+          "platform",
+          "category",
+          "priority",
+          "status",
+          "monthly_amount_paise",
+          "payment_rail",
+          "action_type",
+          "action_steps"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CaseTaskStatus"
+          },
+          "monthly_amount_paise": {
+            "type": "integer"
+          },
+          "payment_rail": {
+            "$ref": "#/components/schemas/RecurringPaymentRail"
+          },
+          "payment_reference_hint": {
+            "type": "string",
+            "nullable": true
+          },
+          "action_type": {
+            "type": "string",
+            "enum": [
+              "card_dispute",
+              "revoke_upi_autopay",
+              "cancel_recurring_payment"
+            ]
+          },
+          "action_steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "letter_template": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CaseBleedStopperResponse": {
+        "type": "object",
+        "required": [
+          "summary",
+          "monthly_bleed_paise",
+          "recurring_task_count",
+          "rows"
+        ],
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/CaseBleedStopperCaseSummaryResponse"
+          },
+          "monthly_bleed_paise": {
+            "type": "integer"
+          },
+          "recurring_task_count": {
+            "type": "integer"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseBleedStopperRowResponse"
+            }
+          }
+        }
+      },
       "TrustedContactCreateRequest": {
         "type": "object",
         "required": [
@@ -3987,6 +4227,27 @@ export const openApiDocument = {
             "type": "string",
             "nullable": true
           },
+          "is_recurring_payment": {
+            "type": "boolean",
+            "default": false
+          },
+          "payment_rail": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RecurringPaymentRail"
+              }
+            ],
+            "nullable": true
+          },
+          "monthly_amount_paise": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true
+          },
+          "payment_reference_hint": {
+            "type": "string",
+            "nullable": true
+          },
           "importance_level": {
             "type": "integer",
             "default": 2
@@ -4018,6 +4279,26 @@ export const openApiDocument = {
           },
           "importance_level": {
             "type": "integer"
+          },
+          "is_recurring_payment": {
+            "type": "boolean",
+            "default": false
+          },
+          "payment_rail": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RecurringPaymentRail"
+              }
+            ],
+            "nullable": true
+          },
+          "monthly_amount_paise": {
+            "type": "integer",
+            "nullable": true
+          },
+          "payment_reference_hint": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -4066,6 +4347,27 @@ export const openApiDocument = {
             "type": "string"
           },
           "username_hint": {
+            "type": "string",
+            "nullable": true
+          },
+          "is_recurring_payment": {
+            "type": "boolean",
+            "default": false
+          },
+          "payment_rail": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RecurringPaymentRail"
+              }
+            ],
+            "nullable": true
+          },
+          "monthly_amount_paise": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true
+          },
+          "payment_reference_hint": {
             "type": "string",
             "nullable": true
           },

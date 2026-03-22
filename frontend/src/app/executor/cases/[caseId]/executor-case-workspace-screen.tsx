@@ -2,19 +2,23 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Download, FileUp, PencilLine, Printer, RotateCcw } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Download, FileUp, PencilLine, Printer, RotateCcw } from 'lucide-react';
 
 import { Dialog } from '../../../../components/ui/Dialog';
 import { Button } from '../../../../components/ui/Button';
 import { Input } from '../../../../components/ui/Input';
 import { type CaseTaskResponse } from '../../../../lib/api-client';
+import { formatInrFromPaise, formatPaymentRailLabel } from '../../../../lib/utils';
 import {
   EXECUTOR_TASK_STATUSES,
   INITIAL_EXECUTOR_TASK_FILTERS,
+  formatExecutorDate,
   formatExecutorTimestamp,
+  getExecutorBleedStopperActionLabel,
   getExecutorCaseLabel,
   getExecutorEvidenceStatusLabel,
   getExecutorStatusLabel,
+  isExecutorTaskTerminal,
   type ExecutorTaskDraft,
   useExecutorCase,
 } from '../../../../lib/use-executor-cases';
@@ -38,11 +42,13 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
     caseSummary,
     tasks,
     activity,
+    bleedStopper,
     evidenceByTask,
     filters,
     isLoadingCase,
     isLoadingTasks,
     isLoadingActivity,
+    isLoadingBleedStopper,
     feedback,
     error,
     loadingAction,
@@ -83,6 +89,14 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
         return true;
       }),
     [filters, tasks],
+  );
+  const recurringTasksRequiringActionCount = useMemo(
+    () => bleedStopper?.rows.filter((row) => !isExecutorTaskTerminal(row.status)).length || 0,
+    [bleedStopper],
+  );
+  const recurringActionRows = useMemo(
+    () => (bleedStopper?.rows || []).filter((row) => !isExecutorTaskTerminal(row.status)).slice(0, 4),
+    [bleedStopper],
   );
 
   const openTaskEditor = (task: CaseTaskResponse) => {
@@ -149,14 +163,25 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
         <section className="inventory-panel glass-panel executor-section">
           <div className="executor-section-header">
             <div>
-              <p className="item-badge">Activation</p>
+              <p className="item-badge">{caseSummary.status === 'closed' ? 'Closed' : 'Activation'}</p>
               <h1 className="section-title">{getExecutorCaseLabel(caseSummary)}</h1>
-              <p className="dash-subtitle">This case is still pending activation. Return to the executor landing page to upload the death certificate.</p>
+              <p className="dash-subtitle">
+                {caseSummary.status === 'closed'
+                  ? `This case is closed. Evidence is retained until ${caseSummary.evidence_retention_expires_at ? formatExecutorDate(caseSummary.evidence_retention_expires_at) : 'the retention window ends'}.`
+                  : 'This case is still pending activation. Return to the executor landing page to upload the death certificate.'}
+              </p>
             </div>
           </div>
-          <Button type="button" variant="secondary" onClick={() => router.push('/executor')}>
-            <ArrowLeft size={16} /> Back to Cases
-          </Button>
+          <div className="inventory-actions-row">
+            <Button type="button" variant="secondary" onClick={() => router.push('/executor')}>
+              <ArrowLeft size={16} /> Back to Cases
+            </Button>
+            {caseSummary.status === 'closed' ? (
+              <Button type="button" onClick={() => router.push(`/executor/cases/${caseId}/report`)}>
+                <Printer size={16} /> View Closure Report
+              </Button>
+            ) : null}
+          </div>
         </section>
       </div>
     );
@@ -182,6 +207,9 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
           <Button type="button" variant="ghost" onClick={() => router.push('/executor')}>
             <ArrowLeft size={16} /> Back to Cases
           </Button>
+          <Button type="button" variant="secondary" onClick={() => router.push(`/executor/cases/${caseId}/bleed-stopper`)}>
+            <AlertCircle size={16} /> Subscription Bleed Stopper
+          </Button>
           <Button type="button" variant="secondary" onClick={() => router.push(`/executor/cases/${caseId}/report`)}>
             <Printer size={16} /> Closure Report
           </Button>
@@ -190,6 +218,59 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
 
       {feedback ? <p className="inventory-feedback">{feedback}</p> : null}
       {error ? <p className="input-error-msg">{error}</p> : null}
+
+      <section className="inventory-panel glass-panel executor-section bleed-stopper-panel">
+        <div className="executor-section-header">
+          <div>
+            <p className="item-badge">Bleed Stopper</p>
+            <h2 className="section-title">Subscription Bleed Stopper</h2>
+            <p className="dash-subtitle">Recurring payment snapshots from planning mode are frozen into this case at activation.</p>
+          </div>
+          <Button type="button" variant="secondary" onClick={() => router.push(`/executor/cases/${caseId}/bleed-stopper`)}>
+            <Printer size={16} /> Open Printable Checklist
+          </Button>
+        </div>
+
+        {isLoadingBleedStopper ? (
+          <p className="inventory-empty">Loading recurring payment checklist...</p>
+        ) : !bleedStopper || bleedStopper.recurring_task_count === 0 ? (
+          <p className="inventory-empty">No recurring subscriptions were captured in planning mode for this case.</p>
+        ) : (
+          <>
+            <div className="bleed-stopper-summary-grid">
+              <div className="report-summary-card">
+                <span>Estimated monthly bleed</span>
+                <strong>{formatInrFromPaise(bleedStopper.monthly_bleed_paise)}</strong>
+              </div>
+              <div className="report-summary-card">
+                <span>Recurring tasks</span>
+                <strong>{bleedStopper.recurring_task_count}</strong>
+              </div>
+              <div className="report-summary-card">
+                <span>Requiring action</span>
+                <strong>{recurringTasksRequiringActionCount}</strong>
+              </div>
+            </div>
+
+            <div className="bleed-stopper-preview-list">
+              {(recurringActionRows.length > 0 ? recurringActionRows : bleedStopper.rows.slice(0, 4)).map((row) => (
+                <div key={row.task_id} className="bleed-stopper-preview-item">
+                  <div>
+                    <strong>{row.platform}</strong>
+                    <p className="item-secondary">
+                      {row.category} • {formatPaymentRailLabel(row.payment_rail)} • {formatInrFromPaise(row.monthly_amount_paise)} / month
+                    </p>
+                    <p className="item-secondary">{getExecutorBleedStopperActionLabel(row.action_type)}</p>
+                  </div>
+                  <span className={`status-indicator ${isExecutorTaskTerminal(row.status) ? 'success' : 'warning'}`}>
+                    {getExecutorStatusLabel(row.status)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
 
       <Dialog
         open={Boolean(selectedTask && draft)}
@@ -216,6 +297,22 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
                 <span>Priority</span>
                 <strong>{selectedTask.priority}</strong>
               </div>
+              {selectedTask.is_recurring_payment ? (
+                <>
+                  <div>
+                    <span>Recurring payment</span>
+                    <strong>{formatInrFromPaise(selectedTask.monthly_amount_paise)} / month</strong>
+                  </div>
+                  <div>
+                    <span>Payment rail</span>
+                    <strong>{formatPaymentRailLabel(selectedTask.payment_rail)}</strong>
+                  </div>
+                  <div>
+                    <span>Reference hint</span>
+                    <strong>{selectedTask.payment_reference_hint || 'Not provided'}</strong>
+                  </div>
+                </>
+              ) : null}
             </div>
 
             <label className="input-label" htmlFor="task-status">
@@ -478,6 +575,11 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
                             <span>Priority {task.priority}</span>
                           </div>
                           <p>{task.category}</p>
+                          {task.is_recurring_payment ? (
+                            <span className="item-secondary">
+                              Recurring • {formatPaymentRailLabel(task.payment_rail)} • {formatInrFromPaise(task.monthly_amount_paise)} / month
+                            </span>
+                          ) : null}
                           <span className="item-secondary">Evidence: {task.evidence_count}</span>
                           {task.reference_number ? <span className="item-secondary">Ref: {task.reference_number}</span> : null}
                         </button>
@@ -541,6 +643,14 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
                   <p className="item-secondary">
                     {getExecutorStatusLabel(task.status)} • Priority {task.priority}
                   </p>
+                  {task.is_recurring_payment ? (
+                    <p className="item-secondary">
+                      Recurring: {formatPaymentRailLabel(task.payment_rail)} • {formatInrFromPaise(task.monthly_amount_paise)} / month
+                    </p>
+                  ) : null}
+                  {task.is_recurring_payment && task.payment_reference_hint ? (
+                    <p className="item-secondary">Payment reference: {task.payment_reference_hint}</p>
+                  ) : null}
                   <p className="item-secondary">Evidence files: {task.evidence_count}</p>
                   {task.reference_number ? <p className="item-secondary">Reference: {task.reference_number}</p> : null}
                   {task.submitted_date ? <p className="item-secondary">Submitted: {task.submitted_date}</p> : null}

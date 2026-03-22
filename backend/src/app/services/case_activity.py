@@ -14,6 +14,9 @@ CASE_EVIDENCE_UPLOAD_INITIALIZED_ACTION = "case_evidence_upload_initialized"
 CASE_EVIDENCE_SCAN_PASSED_ACTION = "case_evidence_scan_passed"
 CASE_EVIDENCE_SCAN_FAILED_ACTION = "case_evidence_scan_failed"
 CASE_REPORT_VIEWED_ACTION = "case_report_viewed"
+CASE_CONTACTS_NOTIFIED_ACTION = "case_contacts_notified"
+CASE_CLOSED_ACTION = "case_closed"
+CASE_EVIDENCE_RETENTION_PURGED_ACTION = "case_evidence_retention_purged"
 
 
 def hash_ip(ip: str | None) -> str | None:
@@ -202,4 +205,68 @@ async def record_case_report_viewed(
         client_ip=client_ip,
         message="Printable closure report viewed.",
         metadata={"report_ready": report_ready, "warning_count": warning_count},
+    )
+
+
+async def record_case_contacts_notified(
+    db: AsyncSession,
+    *,
+    case_id: str,
+    actor_id: str | None,
+    request_id: str | None,
+    client_ip: str | None,
+    recipient_count: int,
+) -> None:
+    await record_case_activity(
+        db,
+        case_id=case_id,
+        action=CASE_CONTACTS_NOTIFIED_ACTION,
+        actor_id=actor_id,
+        request_id=request_id,
+        client_ip=client_ip,
+        message=f"Case open notification sent to {recipient_count} designated contact{'s' if recipient_count != 1 else ''}.",
+        metadata={"recipient_count": recipient_count},
+    )
+
+
+async def record_case_closed(
+    db: AsyncSession,
+    *,
+    case_id: str,
+    actor_id: str | None,
+    request_id: str | None,
+    client_ip: str | None,
+    retained_evidence_count: int,
+    evidence_retention_expires_at,
+) -> None:
+    await record_case_activity(
+        db,
+        case_id=case_id,
+        action=CASE_CLOSED_ACTION,
+        actor_id=actor_id,
+        request_id=request_id,
+        client_ip=client_ip,
+        message="Case closed and evidence retention scheduled.",
+        metadata={
+            "retained_evidence_count": retained_evidence_count,
+            "evidence_retention_expires_at": evidence_retention_expires_at.isoformat() if evidence_retention_expires_at else None,
+        },
+    )
+
+
+async def record_case_evidence_retention_purged(
+    db: AsyncSession,
+    *,
+    case_id: str,
+    purged_evidence_count: int,
+) -> None:
+    await record_case_activity(
+        db,
+        case_id=case_id,
+        action=CASE_EVIDENCE_RETENTION_PURGED_ACTION,
+        actor_id=None,
+        request_id=None,
+        client_ip=None,
+        message=f"Retention cleanup purged {purged_evidence_count} evidence file{'s' if purged_evidence_count != 1 else ''}.",
+        metadata={"purged_evidence_count": purged_evidence_count},
     )

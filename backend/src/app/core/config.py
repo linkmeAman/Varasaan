@@ -89,6 +89,7 @@ class Settings(BaseSettings):
     malware_scan_presign_ttl_seconds: int = 300
 
     scan_failed_purge_after_days: int = 7
+    case_evidence_retention_days: int = 90
     recovery_token_ttl_minutes: int = 20
     recovery_request_cooldown_minutes: int = 15
 

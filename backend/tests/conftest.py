@@ -37,6 +37,9 @@ class FakeAwsService:
         _ = content_type
         self.uploaded[(bucket, object_key)] = payload
 
+    async def delete_object(self, *, bucket: str, object_key: str) -> None:
+        self.uploaded.pop((bucket, object_key), None)
+
 
 class FakeMalwareClient:
     def __init__(self) -> None:
@@ -110,6 +113,7 @@ async def test_context(monkeypatch: pytest.MonkeyPatch):
     fake_malware = FakeMalwareClient()
     monkeypatch.setattr("app.api.deps.get_redis_client", lambda: None)
     monkeypatch.setattr("app.services.documents.get_aws_storage_crypto_service", lambda: fake_aws)
+    monkeypatch.setattr("app.services.cases.get_aws_storage_crypto_service", lambda: fake_aws)
     monkeypatch.setattr("app.services.exports.get_aws_storage_crypto_service", lambda: fake_aws)
     monkeypatch.setattr("app.services.packets.get_aws_storage_crypto_service", lambda: fake_aws)
     monkeypatch.setattr("app.services.documents.get_malware_scan_client", lambda: fake_malware)

@@ -46,29 +46,33 @@ export type LegalPolicyCreateRequest = { policy_type: "privacy" | "terms"; versi
 export type LegalPolicyResponse = { id: string; policy_type: "privacy" | "terms"; version: string; effective_from: string; is_active: boolean; checksum: string; };
 export type CaseStatus = "activation_pending" | "active" | "closed";
 export type CaseTaskStatus = "not_started" | "in_progress" | "submitted" | "waiting" | "resolved" | "escalated";
+export type RecurringPaymentRail = "card" | "upi_autopay" | "other";
 export type CaseTaskStatusCounts = { not_started: number; in_progress: number; submitted: number; waiting: number; resolved: number; escalated: number; };
-export type CaseSummaryResponse = { id: string; owner_user_id: string; owner_name: string; owner_email: string; status: CaseStatus; death_certificate_document_id?: string | null; death_certificate_version_id?: string | null; activated_at?: string | null; closed_at?: string | null; created_at: string; updated_at: string; task_count: number; task_status_counts: CaseTaskStatusCounts; };
+export type CaseSummaryResponse = { id: string; owner_user_id: string; owner_name: string; owner_email: string; status: CaseStatus; death_certificate_document_id?: string | null; death_certificate_version_id?: string | null; activated_at?: string | null; closed_at?: string | null; evidence_retention_expires_at?: string | null; created_at: string; updated_at: string; task_count: number; task_status_counts: CaseTaskStatusCounts; };
 export type CaseActivationUploadInitRequest = { size_bytes: number; content_type: "application/pdf"; sha256?: string | null; };
 export type CaseActivationUploadInitResponse = { document_id: string; version_id: string; version_no: number; object_key: string; upload_url: string; upload_url_expires_in_seconds: number; plaintext_dek_b64: string; kms_key_id: string; doc_type: "death_certificate"; };
 export type CaseActivationConfirmRequest = { document_id: string; version_id: string; };
-export type CaseTaskResponse = { id: string; case_id: string; inventory_account_id?: string | null; platform: string; category: string; priority: number; status: CaseTaskStatus; notes?: string | null; reference_number?: string | null; submitted_date?: string | null; evidence_count: number; evidence_document_id?: string | null; created_at: string; updated_at: string; };
+export type CaseTaskResponse = { id: string; case_id: string; inventory_account_id?: string | null; platform: string; category: string; priority: number; is_recurring_payment?: boolean; payment_rail?: RecurringPaymentRail | null; monthly_amount_paise?: number | null; payment_reference_hint?: string | null; status: CaseTaskStatus; notes?: string | null; reference_number?: string | null; submitted_date?: string | null; evidence_count: number; evidence_document_id?: string | null; created_at: string; updated_at: string; };
 export type CaseTaskPatchRequest = { notes?: string | null; status?: CaseTaskStatus | null; reference_number?: string | null; submitted_date?: string | null; };
 export type CaseTaskEvidenceUploadInitRequest = { file_name: string; size_bytes: number; content_type: "application/pdf" | "image/png" | "image/jpeg"; sha256?: string | null; };
 export type CaseTaskEvidenceUploadInitResponse = { evidence_id: string; document_id: string; version_id: string; version_no: number; object_key: string; upload_url: string; upload_url_expires_in_seconds: number; plaintext_dek_b64: string; kms_key_id: string; doc_type: "case_task_evidence"; };
 export type CaseTaskEvidenceResponse = { id: string; document_id: string; file_name: string; content_type: string; document_state: string; scan_status?: string | null; scan_summary?: string | null; created_at: string; download_available: boolean; };
 export type CaseActivityEventResponse = { timestamp: string; event_type: string; task_id?: string | null; evidence_id?: string | null; actor_label: string; message: string; };
-export type CaseReportSummaryResponse = { case_id: string; owner_name: string; owner_email: string; status: CaseStatus; activated_at?: string | null; generated_at: string; total_tasks: number; resolved_task_count: number; escalated_task_count: number; clean_evidence_count: number; };
+export type CaseReportSummaryResponse = { case_id: string; owner_name: string; owner_email: string; status: CaseStatus; activated_at?: string | null; closed_at?: string | null; evidence_retention_expires_at?: string | null; generated_at: string; total_tasks: number; resolved_task_count: number; escalated_task_count: number; clean_evidence_count: number; };
 export type CaseReportTaskRowResponse = { id: string; platform: string; category: string; priority: number; status: CaseTaskStatus; notes?: string | null; reference_number?: string | null; submitted_date?: string | null; evidence_count: number; clean_evidence_count: number; };
 export type CaseReportEvidenceReferenceResponse = { evidence_id: string; task_id: string; platform: string; category: string; file_name: string; content_type: string; created_at: string; };
 export type CaseReportResponse = { summary: CaseReportSummaryResponse; task_rows: CaseReportTaskRowResponse[]; clean_evidence_references: CaseReportEvidenceReferenceResponse[]; activity_timeline: CaseActivityEventResponse[]; report_ready: boolean; warnings: string[]; };
+export type CaseBleedStopperCaseSummaryResponse = { id: string; owner_name: string; owner_email: string; status: CaseStatus; activated_at?: string | null; };
+export type CaseBleedStopperRowResponse = { task_id: string; platform: string; category: string; priority: number; status: CaseTaskStatus; monthly_amount_paise: number; payment_rail: RecurringPaymentRail; payment_reference_hint?: string | null; action_type: "card_dispute" | "revoke_upi_autopay" | "cancel_recurring_payment"; action_steps: string[]; letter_template?: string | null; };
+export type CaseBleedStopperResponse = { summary: CaseBleedStopperCaseSummaryResponse; monthly_bleed_paise: number; recurring_task_count: number; rows: CaseBleedStopperRowResponse[]; };
 export type TrustedContactCreateRequest = { name: string; email: string; role: "executor" | "viewer" | "packet_access" | "recovery_assist"; recovery_enabled?: boolean; };
 export type TrustedContactInviteRequest = { force_reissue?: boolean; };
 export type TrustedContactResponse = { id: string; name: string; email: string; role: "executor" | "viewer" | "packet_access" | "recovery_assist"; status: "pending" | "active" | "revoked"; };
-export type InventoryCreateRequest = { platform: string; category: string; username_hint?: string | null; importance_level?: number; };
-export type InventoryResponse = { id: string; platform: string; category: string; username_hint?: string | null; importance_level: number; };
+export type InventoryCreateRequest = { platform: string; category: string; username_hint?: string | null; is_recurring_payment?: boolean; payment_rail?: RecurringPaymentRail | null; monthly_amount_paise?: number | null; payment_reference_hint?: string | null; importance_level?: number; };
+export type InventoryResponse = { id: string; platform: string; category: string; username_hint?: string | null; importance_level: number; is_recurring_payment?: boolean; payment_rail?: RecurringPaymentRail | null; monthly_amount_paise?: number | null; payment_reference_hint?: string | null; };
 export type PasswordResetRequestResponse = { message: string; reset_token?: string | null; };
 export type TrustedContactInviteResponse = { message: string; invite_token?: string | null; };
-export type InventoryUpdateRequest = { platform: string; category: string; username_hint?: string | null; importance_level: number; };
+export type InventoryUpdateRequest = { platform: string; category: string; username_hint?: string | null; is_recurring_payment?: boolean; payment_rail?: RecurringPaymentRail | null; monthly_amount_paise?: number | null; payment_reference_hint?: string | null; importance_level: number; };
 export type DocumentVersionStatusResponse = { id: string; document_id: string; version_no: number; state: string; object_key: string; size_bytes: number; sha256?: string | null; created_at: string; scan_status?: string | null; scan_summary?: string | null; scan_failed_purge_at?: string | null; };
 export type DocumentSummaryResponse = { id: string; doc_type: string; state: string; current_version_id?: string | null; created_at: string; deleted_at?: string | null; current_version?: DocumentVersionStatusResponse; };
 export type DocumentDetailResponse = DocumentSummaryResponse & { versions: DocumentVersionStatusResponse[]; };
@@ -127,6 +131,14 @@ export interface ActivateCaseArgs {
 }
 
 export interface GetCaseActivityArgs {
+  caseId: string;
+}
+
+export interface GetCaseBleedStopperArgs {
+  caseId: string;
+}
+
+export interface CloseCaseArgs {
   caseId: string;
 }
 
@@ -448,6 +460,22 @@ export class VarasaanApiClient {
       ...config,
       method: "GET",
       url: `/api/v1/cases/${encodeURIComponent(String(args.caseId))}/activity`,
+    });
+  }
+
+  public async getCaseBleedStopper(args: GetCaseBleedStopperArgs, config: AxiosRequestConfig = {}): Promise<CaseBleedStopperResponse> {
+    return this.request<CaseBleedStopperResponse>({
+      ...config,
+      method: "GET",
+      url: `/api/v1/cases/${encodeURIComponent(String(args.caseId))}/bleed-stopper`,
+    });
+  }
+
+  public async closeCase(args: CloseCaseArgs, config: AxiosRequestConfig = {}): Promise<CaseSummaryResponse> {
+    return this.request<CaseSummaryResponse>({
+      ...config,
+      method: "POST",
+      url: `/api/v1/cases/${encodeURIComponent(String(args.caseId))}/close`,
     });
   }
 

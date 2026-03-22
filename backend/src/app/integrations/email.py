@@ -135,6 +135,29 @@ class EmailClient:
             ),
         )
 
+    async def send_case_open_notification(
+        self,
+        *,
+        to_email: str,
+        owner_email: str,
+        owner_name: str | None,
+        activated_at: datetime,
+        task_count: int,
+    ) -> None:
+        owner_label = owner_name or owner_email
+        case_url = f"{self._settings.frontend_base_url.rstrip('/')}/executor"
+        await self._send(
+            to_email=to_email,
+            subject="Varasaan case is now open",
+            text_body=(
+                f"A Varasaan after-loss case for {owner_label} is now active.\n"
+                f"Owner email: {owner_email}\n"
+                f"Activated at: {activated_at.isoformat()}\n"
+                f"Task count: {task_count}\n"
+                f"Open the executor workspace: {case_url}"
+            ),
+        )
+
 
 @lru_cache
 def get_email_client() -> EmailClient:

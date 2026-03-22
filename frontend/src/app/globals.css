@@ -1452,6 +1452,97 @@ button {
   font-size: 0.95rem;
 }
 
+.bleed-stopper-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.bleed-stopper-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.bleed-stopper-preview-list,
+.bleed-stopper-row-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.bleed-stopper-preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: rgba(2, 6, 23, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bleed-stopper-row {
+  padding: 1.25rem;
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background: rgba(2, 6, 23, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bleed-stopper-row-header,
+.bleed-stopper-row-badges {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.bleed-stopper-row-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem;
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.bleed-stopper-row-meta span {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.bleed-stopper-row-meta strong {
+  color: var(--text-primary);
+}
+
+.bleed-stopper-step-list {
+  margin-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  color: var(--text-primary);
+}
+
+.bleed-stopper-letter {
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.bleed-stopper-letter pre {
+  white-space: pre-wrap;
+  font-family: var(--font-inter), -apple-system, sans-serif;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
 @media (min-width: 960px) {
   .executor-shell-bar {
     grid-template-columns: auto 1fr auto auto;
@@ -1475,6 +1566,10 @@ button {
 
   .executor-task-readonly {
     grid-template-columns: 1fr;
+  }
+
+  .bleed-stopper-preview-item {
+    flex-direction: column;
   }
 }
 
@@ -1512,7 +1607,10 @@ button {
   .glass-panel,
   .executor-evidence-item,
   .executor-activity-item,
-  .report-summary-card {
+  .report-summary-card,
+  .bleed-stopper-row,
+  .bleed-stopper-preview-item,
+  .bleed-stopper-letter {
     background: #ffffff;
     border: 1px solid #d7dee8;
     box-shadow: none;
@@ -1522,6 +1620,12 @@ button {
 
   .executor-header,
   .inventory-panel {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .bleed-stopper-row,
+  .bleed-stopper-letter {
     break-inside: avoid;
     page-break-inside: avoid;
   }
@@ -1786,6 +1890,30 @@ button {
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: flex-end;
+}
+
+.inventory-recurring-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inventory-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-primary);
+}
+
+.inventory-checkbox input {
+  accent-color: var(--brand-primary);
+}
+
+.inventory-recurring-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
 }
 
 .inventory-item-actions {

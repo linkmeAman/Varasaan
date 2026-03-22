@@ -1,6 +1,6 @@
 # Integration Checklist
 
-- Updated on: 2026-03-21
+- Updated on: 2026-03-22
 - Scope: frontend-backend contract sync for `packages/shared/openapi/openapi.yaml`
 - Result: contract, generated frontend client, cookie-auth flow, and backend route coverage are aligned for planning-mode and executor case flows.
 
@@ -27,6 +27,7 @@
 | `GET` | `/api/v1/cases/{caseId}` | `getCaseSummary` | `-` | `CaseSummaryResponse` | Contract + type sync | Synced |
 | `POST` | `/api/v1/cases/{caseId}/death-certificate/uploads/init` | `initCaseDeathCertificateUpload` | `CaseActivationUploadInitRequest` | `CaseActivationUploadInitResponse` | Integration test | Synced |
 | `POST` | `/api/v1/cases/{caseId}/activate` | `activateCase` | `CaseActivationConfirmRequest` | `CaseSummaryResponse` | Integration test | Synced |
+| `POST` | `/api/v1/cases/{caseId}/close` | `closeCase` | `-` | `CaseSummaryResponse` | Integration test | Synced |
 | `GET` | `/api/v1/cases/{caseId}/tasks` | `listCaseTasks` | `status/platform/category/priority (query)` | `CaseTaskResponse[]` | Integration test | Synced |
 | `PATCH` | `/api/v1/cases/{caseId}/tasks/{taskId}` | `patchCaseTask` | `CaseTaskPatchRequest` | `CaseTaskResponse` | Integration test | Synced |
 | `GET` | `/api/v1/legal/policies` | `listPolicies` | `-` | `LegalPolicyResponse[]` | Contract + type sync | Synced |
@@ -60,11 +61,11 @@
 - Frontend payload/request-response types are regenerated from the same OpenAPI source into `frontend/src/lib/generated/api-client.ts` and `frontend/src/api/openapi-types.ts`.
 - Browser clients use credentialed cookies plus double-submit CSRF headers for mutating auth/session requests.
 - Backend route surface is validated against the same contract in `backend/tests/test_contract_sync.py` (path+method parity, excluding intentionally hidden testing routes).
-- Generated artifacts now include executor-case payloads and enums such as `TrustedContactRole`, `CaseStatus`, and `CaseTaskStatus`.
+- Generated artifacts now include executor-case payloads and enums such as `TrustedContactRole`, `CaseStatus`, and `CaseTaskStatus`, along with closed-case retention metadata on summary/report payloads.
 
 ## Known Gaps
 
 - Hidden mock-storage routes under `/api/v1/testing/*` are test-only and intentionally excluded from public OpenAPI.
-- Manual review, multi-participant case collaboration, evidence upload/download, and notifications are intentionally excluded from the current case contract surface.
+- Manual review and multi-participant case collaboration are intentionally excluded from the current case contract surface.
 - Live Razorpay/Postmark validation still depends on staging credentials and must be executed as part of the launch runbook.
 - Alert routing is operationally validated through staging smoke checks; it is not exercised by unit or contract tests.

@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
+from app.integrations.aws import get_aws_storage_crypto_service
+from app.integrations.email import get_email_client
 from app.models import (
     AuditLog,
     Case,
@@ -24,6 +28,7 @@ from app.models import (
     InventoryAccount,
     MalwareScan,
     MalwareScanStatus,
+    RecurringPaymentRail,
     TrustedContact,
     TrustedContactRole,
     TrustedContactStatus,
@@ -34,6 +39,9 @@ from app.schemas.cases import (
     CASE_TASK_EVIDENCE_DOC_TYPE,
     DEATH_CERTIFICATE_DOC_TYPE,
     CaseActivityEventResponse,
+    CaseBleedStopperCaseSummaryResponse,
+    CaseBleedStopperResponse,
+    CaseBleedStopperRowResponse,
     CaseReportEvidenceReferenceResponse,
     CaseReportResponse,
     CaseReportSummaryResponse,
@@ -43,12 +51,16 @@ from app.schemas.documents import UploadInitRequest
 from app.services import documents as document_service
 from app.services.case_activity import (
     record_case_activated,
+    record_case_closed,
+    record_case_contacts_notified,
+    record_case_evidence_retention_purged,
     record_case_evidence_upload_initialized,
     record_case_report_viewed,
     record_case_task_updated,
 )
 
 TERMINAL_CASE_TASK_STATUSES = {CaseTaskStatus.RESOLVED, CaseTaskStatus.ESCALATED}
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -58,6 +70,15 @@ class CaseTaskEvidenceSnapshot:
     document: Document
     version: DocumentVersion | None
     scan: MalwareScan | None
+
+
+@dataclass(slots=True)
+class CaseReportComputation:
+    summary: CaseReportSummaryResponse
+    task_rows: list[CaseReportTaskRowResponse]
+    clean_evidence_references: list[CaseReportEvidenceReferenceResponse]
+    report_ready: bool
+    warnings: list[str]
 
 
 def _normalize_email(email: str) -> str:
@@ -97,6 +118,110 @@ def _display_owner_name(owner: User | None) -> str:
         if normalized:
             return normalized
     return owner.email if owner else ""
+
+
+def _format_inr_amount(monthly_amount_paise: int) -> str:
+    return f"INR {monthly_amount_paise / 100:.2f}"
+
+
+def _recurring_reference_label(task: CaseTask) -> str:
+    return task.payment_reference_hint or task.platform
+
+
+def _build_card_action_steps(task: CaseTask) -> list[str]:
+    reference_label = _recurring_reference_label(task)
+    return [
+        f"Review the latest card statement and locate the merchant descriptor for {reference_label}.",
+        "Contact the card issuer or bank and request cancellation of the recurring merchant mandate.",
+        "Raise a dispute for any debit that was processed after the loss event or after cancellation was requested.",
+        "Capture the complaint number, support email, or cancellation confirmation as task evidence.",
+    ]
+
+
+def _build_upi_autopay_action_steps(task: CaseTask) -> list[str]:
+    reference_label = _recurring_reference_label(task)
+    return [
+        f"Open the bank or UPI app that manages the autopay mandate for {reference_label}.",
+        "Navigate to UPI mandates or autopay instructions and revoke the active mandate.",
+        "If the mandate cannot be revoked in-app, contact the bank and request manual revocation of the UPI autopay.",
+        "Capture the revocation confirmation or app screenshot as task evidence.",
+    ]
+
+
+def _build_generic_action_steps(task: CaseTask) -> list[str]:
+    reference_label = _recurring_reference_label(task)
+    return [
+        f"Contact {task.platform} support and request cancellation of the recurring payment tied to {reference_label}.",
+        "Ask for written confirmation that future renewals and debits have been stopped.",
+        "If billing continues, escalate through the payment provider or bank and note the case reference.",
+        "Capture the cancellation email thread, ticket, or screenshot as task evidence.",
+    ]
+
+
+def _build_card_dispute_letter(*, owner_name: str, owner_email: str, task: CaseTask) -> str:
+    reference_label = _recurring_reference_label(task)
+    return "\n".join(
+        [
+            "Subject: Request to cancel recurring card charge and review disputed debit",
+            "",
+            "To the card issuer or bank support team,",
+            "",
+            f"I am writing regarding the estate of {owner_name} ({owner_email}).",
+            f"Please cancel any recurring card charge linked to {task.platform} and the merchant reference {reference_label}.",
+            f"The estimated recurring amount is {_format_inr_amount(task.monthly_amount_paise or 0)} per month.",
+            "",
+            "Please block future recurring debits for this merchant, review any debit that should be reversed, and confirm the action taken in writing.",
+            "",
+            "Supporting documents, including the death certificate and account statements, can be provided on request.",
+            "",
+            "Regards,",
+            "Executor / estate representative",
+        ]
+    )
+
+
+def _build_bleed_stopper_row(*, task: CaseTask, owner_name: str, owner_email: str) -> CaseBleedStopperRowResponse:
+    if task.payment_rail == RecurringPaymentRail.CARD:
+        return CaseBleedStopperRowResponse(
+            task_id=task.id,
+            platform=task.platform,
+            category=task.category,
+            priority=task.priority,
+            status=task.status,
+            monthly_amount_paise=task.monthly_amount_paise or 0,
+            payment_rail=RecurringPaymentRail.CARD,
+            payment_reference_hint=task.payment_reference_hint,
+            action_type="card_dispute",
+            action_steps=_build_card_action_steps(task),
+            letter_template=_build_card_dispute_letter(owner_name=owner_name, owner_email=owner_email, task=task),
+        )
+
+    if task.payment_rail == RecurringPaymentRail.UPI_AUTOPAY:
+        return CaseBleedStopperRowResponse(
+            task_id=task.id,
+            platform=task.platform,
+            category=task.category,
+            priority=task.priority,
+            status=task.status,
+            monthly_amount_paise=task.monthly_amount_paise or 0,
+            payment_rail=RecurringPaymentRail.UPI_AUTOPAY,
+            payment_reference_hint=task.payment_reference_hint,
+            action_type="revoke_upi_autopay",
+            action_steps=_build_upi_autopay_action_steps(task),
+        )
+
+    return CaseBleedStopperRowResponse(
+        task_id=task.id,
+        platform=task.platform,
+        category=task.category,
+        priority=task.priority,
+        status=task.status,
+        monthly_amount_paise=task.monthly_amount_paise or 0,
+        payment_rail=RecurringPaymentRail.OTHER,
+        payment_reference_hint=task.payment_reference_hint,
+        action_type="cancel_recurring_payment",
+        action_steps=_build_generic_action_steps(task),
+    )
 
 
 def _evidence_download_available(snapshot: CaseTaskEvidenceSnapshot) -> bool:
@@ -268,6 +393,76 @@ async def _case_task_count(db: AsyncSession, *, case_id: str) -> int:
     return int(result.scalar_one())
 
 
+async def _schedule_case_evidence_retention(
+    db: AsyncSession,
+    *,
+    case_id: str,
+    expires_at: datetime,
+) -> int:
+    result = await db.execute(
+        select(CaseTaskEvidence)
+        .join(CaseTask, CaseTask.id == CaseTaskEvidence.case_task_id)
+        .where(
+            CaseTask.case_id == case_id,
+            CaseTaskEvidence.retention_purged_at.is_(None),
+        )
+    )
+    rows = list(result.scalars().all())
+    for evidence in rows:
+        evidence.retention_purge_at = expires_at
+    await db.flush()
+    return len(rows)
+
+
+async def _notify_case_contacts(
+    db: AsyncSession,
+    *,
+    case: Case,
+    actor_id: str | None,
+    request_id: str | None,
+    client_ip: str | None,
+    task_count: int,
+) -> None:
+    owner = await db.get(User, case.owner_user_id)
+    owner_name = _display_owner_name(owner) or None
+    owner_email = owner.email if owner else ""
+    result = await db.execute(
+        select(TrustedContact)
+        .where(
+            TrustedContact.user_id == case.owner_user_id,
+            TrustedContact.status == TrustedContactStatus.ACTIVE,
+        )
+        .order_by(TrustedContact.created_at.asc(), TrustedContact.id.asc())
+    )
+
+    sent_to: set[str] = set()
+    for contact in result.scalars().all():
+        normalized_email = _normalize_email(contact.email)
+        if normalized_email in sent_to:
+            continue
+        try:
+            await get_email_client().send_case_open_notification(
+                to_email=contact.email,
+                owner_email=owner_email,
+                owner_name=owner_name,
+                activated_at=case.activated_at or datetime.now(UTC),
+                task_count=task_count,
+            )
+            sent_to.add(normalized_email)
+        except Exception as exc:  # pragma: no cover
+            logger.warning("case open notification failed for %s: %s", contact.email, exc)
+
+    if sent_to:
+        await record_case_contacts_notified(
+            db,
+            case_id=case.id,
+            actor_id=actor_id,
+            request_id=request_id,
+            client_ip=client_ip,
+            recipient_count=len(sent_to),
+        )
+
+
 async def _seed_case_tasks_from_inventory(db: AsyncSession, *, case: Case) -> None:
     existing_result = await db.execute(select(CaseTask.inventory_account_id).where(CaseTask.case_id == case.id))
     existing_inventory_ids = {
@@ -291,6 +486,10 @@ async def _seed_case_tasks_from_inventory(db: AsyncSession, *, case: Case) -> No
                 platform=account.platform,
                 category=account.category,
                 priority=account.importance_level,
+                is_recurring_payment=account.is_recurring_payment,
+                payment_rail=account.payment_rail,
+                monthly_amount_paise=account.monthly_amount_paise,
+                payment_reference_hint=account.payment_reference_hint,
                 status=CaseTaskStatus.NOT_STARTED,
             )
         )
@@ -349,14 +548,68 @@ async def activate_case(
 
     await db.flush()
     if not was_active:
+        task_count = await _case_task_count(db, case_id=case.id)
         await record_case_activated(
             db,
             case_id=case.id,
             actor_id=actor_id,
             request_id=request_id,
             client_ip=client_ip,
-            task_count=await _case_task_count(db, case_id=case.id),
+            task_count=task_count,
         )
+        await _notify_case_contacts(
+            db,
+            case=case,
+            actor_id=actor_id,
+            request_id=request_id,
+            client_ip=client_ip,
+            task_count=task_count,
+        )
+    return case
+
+
+async def close_case(
+    db: AsyncSession,
+    *,
+    case: Case,
+    actor_id: str | None = None,
+    request_id: str | None = None,
+    client_ip: str | None = None,
+) -> Case:
+    if case.status == CaseStatus.CLOSED:
+        return case
+    if case.status != CaseStatus.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only active cases can be closed")
+
+    report = await _build_case_report_data(db, case=case)
+    if not report.report_ready or report.warnings:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Case can be closed only after all tasks are terminal and clean evidence is available",
+        )
+
+    settings = get_settings()
+    closed_at = datetime.now(UTC)
+    retention_expires_at = closed_at + timedelta(days=settings.case_evidence_retention_days)
+
+    case.status = CaseStatus.CLOSED
+    case.closed_at = closed_at
+    case.evidence_retention_expires_at = retention_expires_at
+    retained_evidence_count = await _schedule_case_evidence_retention(
+        db,
+        case_id=case.id,
+        expires_at=retention_expires_at,
+    )
+    await db.flush()
+    await record_case_closed(
+        db,
+        case_id=case.id,
+        actor_id=actor_id,
+        request_id=request_id,
+        client_ip=client_ip,
+        retained_evidence_count=retained_evidence_count,
+        evidence_retention_expires_at=retention_expires_at,
+    )
     return case
 
 
@@ -458,7 +711,10 @@ async def get_case_task_evidence_counts(db: AsyncSession, *, task_ids: list[str]
 
     result = await db.execute(
         select(CaseTaskEvidence.case_task_id, func.count(CaseTaskEvidence.id))
-        .where(CaseTaskEvidence.case_task_id.in_(task_ids))
+        .where(
+            CaseTaskEvidence.case_task_id.in_(task_ids),
+            CaseTaskEvidence.retention_purged_at.is_(None),
+        )
         .group_by(CaseTaskEvidence.case_task_id)
     )
     return {str(task_id): int(count) for task_id, count in result.all()}
@@ -491,6 +747,7 @@ async def list_case_evidence_snapshots(
         )
         .outerjoin(MalwareScan, MalwareScan.version_id == DocumentVersion.id)
         .where(CaseTask.case_id == case_id)
+        .where(CaseTaskEvidence.retention_purged_at.is_(None))
         .order_by(CaseTask.priority.desc(), CaseTask.created_at.asc(), CaseTaskEvidence.created_at.asc())
     )
     if task_id:
@@ -611,14 +868,55 @@ async def list_case_activity_events(
     return events
 
 
-async def build_case_report(
+async def build_case_bleed_stopper(
     db: AsyncSession,
     *,
     case: Case,
-    actor_id: str | None = None,
-    request_id: str | None = None,
-    client_ip: str | None = None,
-) -> CaseReportResponse:
+) -> CaseBleedStopperResponse:
+    if case.status != CaseStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Subscription bleed stopper is available only after activation",
+        )
+
+    owner = await db.get(User, case.owner_user_id)
+    owner_name = _display_owner_name(owner)
+    owner_email = owner.email if owner else ""
+    tasks = await list_case_tasks(db, case_id=case.id)
+    recurring_tasks = [
+        task
+        for task in tasks
+        if task.is_recurring_payment and task.payment_rail is not None and task.monthly_amount_paise is not None
+    ]
+    recurring_tasks.sort(
+        key=lambda task: (
+            -int(task.monthly_amount_paise or 0),
+            -task.priority,
+            task.platform.lower(),
+            task.created_at,
+        )
+    )
+
+    rows = [_build_bleed_stopper_row(task=task, owner_name=owner_name, owner_email=owner_email) for task in recurring_tasks]
+    return CaseBleedStopperResponse(
+        summary=CaseBleedStopperCaseSummaryResponse(
+            id=case.id,
+            owner_name=owner_name,
+            owner_email=owner_email,
+            status=case.status,
+            activated_at=case.activated_at,
+        ),
+        monthly_bleed_paise=sum(task.monthly_amount_paise or 0 for task in recurring_tasks),
+        recurring_task_count=len(recurring_tasks),
+        rows=rows,
+    )
+
+
+async def _build_case_report_data(
+    db: AsyncSession,
+    *,
+    case: Case,
+) -> CaseReportComputation:
     owner = await db.get(User, case.owner_user_id)
     tasks = await list_case_tasks(db, case_id=case.id)
     evidence_counts = await get_case_task_evidence_counts(db, task_ids=[task.id for task in tasks])
@@ -675,12 +973,32 @@ async def build_case_report(
         owner_email=owner.email if owner else "",
         status=case.status,
         activated_at=case.activated_at,
+        closed_at=case.closed_at,
+        evidence_retention_expires_at=case.evidence_retention_expires_at,
         generated_at=datetime.now(UTC),
         total_tasks=len(tasks),
         resolved_task_count=sum(1 for task in tasks if task.status == CaseTaskStatus.RESOLVED),
         escalated_task_count=sum(1 for task in tasks if task.status == CaseTaskStatus.ESCALATED),
         clean_evidence_count=len(clean_evidence_references),
     )
+    return CaseReportComputation(
+        summary=summary,
+        task_rows=task_rows,
+        clean_evidence_references=clean_evidence_references,
+        report_ready=report_ready,
+        warnings=warnings,
+    )
+
+
+async def build_case_report(
+    db: AsyncSession,
+    *,
+    case: Case,
+    actor_id: str | None = None,
+    request_id: str | None = None,
+    client_ip: str | None = None,
+) -> CaseReportResponse:
+    report = await _build_case_report_data(db, case=case)
 
     await record_case_report_viewed(
         db,
@@ -688,16 +1006,77 @@ async def build_case_report(
         actor_id=actor_id,
         request_id=request_id,
         client_ip=client_ip,
-        report_ready=report_ready,
-        warning_count=len(warnings),
+        report_ready=report.report_ready,
+        warning_count=len(report.warnings),
     )
 
     activity_timeline = await list_case_activity_events(db, case_id=case.id, descending=False)
     return CaseReportResponse(
-        summary=summary,
-        task_rows=task_rows,
-        clean_evidence_references=clean_evidence_references,
+        summary=report.summary,
+        task_rows=report.task_rows,
+        clean_evidence_references=report.clean_evidence_references,
         activity_timeline=activity_timeline,
-        report_ready=report_ready,
-        warnings=warnings,
+        report_ready=report.report_ready,
+        warnings=report.warnings,
     )
+
+
+async def purge_expired_case_evidence(db: AsyncSession, *, now: datetime | None = None) -> int:
+    effective_now = now or datetime.now(UTC)
+    result = await db.execute(
+        select(CaseTaskEvidence, CaseTask)
+        .join(CaseTask, CaseTask.id == CaseTaskEvidence.case_task_id)
+        .where(
+            CaseTaskEvidence.retention_purged_at.is_(None),
+            CaseTaskEvidence.retention_purge_at.is_not(None),
+            CaseTaskEvidence.retention_purge_at <= effective_now,
+        )
+        .order_by(CaseTaskEvidence.retention_purge_at.asc(), CaseTaskEvidence.created_at.asc(), CaseTaskEvidence.id.asc())
+    )
+    due_rows = list(result.all())
+    if not due_rows:
+        return 0
+
+    settings = get_settings()
+    aws_service = get_aws_storage_crypto_service()
+    purged_by_case: Counter[str] = Counter()
+    processed_document_ids: set[str] = set()
+
+    for evidence, task in due_rows:
+        evidence.retention_purged_at = effective_now
+        purged_by_case[task.case_id] += 1
+
+        if evidence.document_id in processed_document_ids:
+            continue
+
+        document = await db.get(Document, evidence.document_id)
+        if document is None:
+            processed_document_ids.add(evidence.document_id)
+            continue
+
+        versions_result = await db.execute(
+            select(DocumentVersion)
+            .where(DocumentVersion.document_id == document.id)
+            .order_by(DocumentVersion.version_no.asc())
+        )
+        for version in versions_result.scalars().all():
+            if version.object_key:
+                await aws_service.delete_object(
+                    bucket=settings.s3_bucket_documents,
+                    object_key=version.object_key,
+                )
+            version.state = DocumentState.PURGED
+
+        document.state = DocumentState.PURGED
+        document.current_version_id = None
+        document.deleted_at = document.deleted_at or effective_now
+        processed_document_ids.add(evidence.document_id)
+
+    await db.flush()
+    for case_id, purged_evidence_count in purged_by_case.items():
+        await record_case_evidence_retention_purged(
+            db,
+            case_id=case_id,
+            purged_evidence_count=purged_evidence_count,
+        )
+    return sum(purged_by_case.values())

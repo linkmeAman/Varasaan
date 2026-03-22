@@ -163,7 +163,7 @@ export function ExecutorLandingScreen() {
               </div>
             </div>
           </section>
-        ) : (
+        ) : selectedCase.status === 'active' ? (
           <section className="inventory-panel glass-panel executor-section">
             <div className="executor-section-header">
               <div>
@@ -182,6 +182,33 @@ export function ExecutorLandingScreen() {
 
               <Button type="button" variant="secondary" onClick={() => router.push(`/executor/cases/${selectedCase.id}`)}>
                 <FolderKanban size={16} /> Open Workspace <ArrowRight size={16} />
+              </Button>
+            </div>
+          </section>
+        ) : (
+          <section className="inventory-panel glass-panel executor-section">
+            <div className="executor-section-header">
+              <div>
+                <p className="item-badge">Closed</p>
+                <h2 className="section-title">{getExecutorCaseLabel(selectedCase)}</h2>
+                <p className="dash-subtitle">
+                  This case is closed. The printable closure report remains available and retained evidence stays accessible until{' '}
+                  {selectedCase.evidence_retention_expires_at
+                    ? new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(new Date(selectedCase.evidence_retention_expires_at))
+                    : 'the retention window ends'}
+                  .
+                </p>
+              </div>
+            </div>
+
+            <div className="executor-active-actions">
+              <div className="executor-active-summary">
+                <span>Tasks: {selectedCase.task_count}</span>
+                <span>Closed: {selectedCase.closed_at ? new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(new Date(selectedCase.closed_at)) : 'Yes'}</span>
+              </div>
+
+              <Button type="button" variant="secondary" onClick={() => router.push(`/executor/cases/${selectedCase.id}/report`)}>
+                <FolderKanban size={16} /> View Closure Report <ArrowRight size={16} />
               </Button>
             </div>
           </section>
