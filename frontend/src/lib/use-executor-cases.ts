@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import {
   apiClient,
   type CaseActivityEventResponse,
+  type CaseActivationReviewStatus,
   type CaseBleedStopperResponse,
   type CaseBleedStopperRowResponse,
   type CaseReportResponse,
@@ -81,6 +82,68 @@ function hasPendingEvidenceScan(rows: CaseTaskEvidenceResponse[] | undefined): b
 
 export function getExecutorCaseLabel(caseSummary: CaseSummaryResponse): string {
   return caseSummary.owner_name || caseSummary.owner_email;
+}
+
+function getExecutorActivationReviewLabel(reviewStatus: CaseActivationReviewStatus | undefined): string {
+  switch (reviewStatus) {
+    case 'pending_review':
+      return 'Pending review';
+    case 'rejected':
+      return 'Rejected review';
+    case 'approved':
+      return 'Approved review';
+    case 'not_requested':
+    default:
+      return 'Activation pending';
+  }
+}
+
+export function getExecutorCaseStatusLabel(caseSummary: CaseSummaryResponse): string {
+  if (caseSummary.status === 'activation_pending') {
+    return getExecutorActivationReviewLabel(caseSummary.activation_review_status);
+  }
+  return getExecutorStatusLabel(caseSummary.status);
+}
+
+export function getExecutorCaseStatusTone(caseSummary: CaseSummaryResponse): string {
+  if (caseSummary.status !== 'activation_pending') {
+    return `executor-status-${caseSummary.status}`;
+  }
+  switch (caseSummary.activation_review_status) {
+    case 'pending_review':
+      return 'executor-status-pending_review';
+    case 'rejected':
+      return 'executor-status-rejected_review';
+    default:
+      return 'executor-status-activation_pending';
+  }
+}
+
+export function canExecutorUploadDeathCertificate(caseSummary: CaseSummaryResponse): boolean {
+  return caseSummary.status === 'activation_pending' && caseSummary.activation_review_status !== 'pending_review';
+}
+
+export function formatExecutorReviewReason(reason: string | null | undefined): string {
+  if (!reason) {
+    return 'Not provided';
+  }
+  return reason.replaceAll('_', ' ');
+}
+
+export function getExecutorActivationDescription(caseSummary: CaseSummaryResponse): string {
+  if (caseSummary.status === 'closed') {
+    return `This case is closed. Evidence is retained until ${
+      caseSummary.evidence_retention_expires_at ? formatExecutorDate(caseSummary.evidence_retention_expires_at) : 'the retention window ends'
+    }.`;
+  }
+  switch (caseSummary.activation_review_status) {
+    case 'pending_review':
+      return 'The uploaded death certificate is awaiting manual review. The executor workspace unlocks after approval.';
+    case 'rejected':
+      return 'The last uploaded death certificate was rejected during manual review. Upload a replacement PDF to continue activation.';
+    default:
+      return 'Upload a PDF death certificate to unlock the executor workspace for this case.';
+  }
 }
 
 export function getExecutorStatusLabel(status: CaseSummaryResponse['status'] | CaseTaskStatus): string {
@@ -269,7 +332,15 @@ export function useExecutorCases() {
       });
 
       await refreshCases();
-      setFeedback('Case activated and tasks generated.');
+      if (activatedCase.status === 'active') {
+        setFeedback('Case activated and tasks generated.');
+      } else if (activatedCase.activation_review_status === 'pending_review') {
+        setFeedback('Death certificate uploaded. Manual review is now pending.');
+      } else if (activatedCase.activation_review_status === 'rejected') {
+        setFeedback('The last uploaded certificate is still rejected. Upload a replacement PDF to continue.');
+      } else {
+        setFeedback('Death certificate uploaded.');
+      }
       return activatedCase;
     } catch (activationError) {
       setError(readApiErrorMessage(activationError, 'Unable to activate this case.'));

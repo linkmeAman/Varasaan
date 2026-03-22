@@ -3325,6 +3325,15 @@ export const openApiDocument = {
           "closed"
         ]
       },
+      "CaseActivationReviewStatus": {
+        "type": "string",
+        "enum": [
+          "not_requested",
+          "pending_review",
+          "approved",
+          "rejected"
+        ]
+      },
       "CaseTaskStatus": {
         "type": "string",
         "enum": [
@@ -3389,6 +3398,11 @@ export const openApiDocument = {
           "owner_name",
           "owner_email",
           "status",
+          "activation_review_status",
+          "activation_review_reason",
+          "activation_review_note",
+          "activation_review_requested_at",
+          "activation_review_updated_at",
           "created_at",
           "updated_at",
           "task_count",
@@ -3412,6 +3426,27 @@ export const openApiDocument = {
           },
           "status": {
             "$ref": "#/components/schemas/CaseStatus"
+          },
+          "activation_review_status": {
+            "$ref": "#/components/schemas/CaseActivationReviewStatus"
+          },
+          "activation_review_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "activation_review_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "activation_review_requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "activation_review_updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "death_certificate_document_id": {
             "type": "string",

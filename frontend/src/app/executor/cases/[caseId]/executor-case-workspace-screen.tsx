@@ -12,10 +12,13 @@ import { formatInrFromPaise, formatPaymentRailLabel } from '../../../../lib/util
 import {
   EXECUTOR_TASK_STATUSES,
   INITIAL_EXECUTOR_TASK_FILTERS,
+  formatExecutorReviewReason,
+  getExecutorActivationDescription,
   formatExecutorDate,
   formatExecutorTimestamp,
   getExecutorBleedStopperActionLabel,
   getExecutorCaseLabel,
+  getExecutorCaseStatusLabel,
   getExecutorEvidenceStatusLabel,
   getExecutorStatusLabel,
   isExecutorTaskTerminal,
@@ -163,15 +166,35 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
         <section className="inventory-panel glass-panel executor-section">
           <div className="executor-section-header">
             <div>
-              <p className="item-badge">{caseSummary.status === 'closed' ? 'Closed' : 'Activation'}</p>
+              <p className="item-badge">{caseSummary.status === 'closed' ? 'Closed' : getExecutorCaseStatusLabel(caseSummary)}</p>
               <h1 className="section-title">{getExecutorCaseLabel(caseSummary)}</h1>
-              <p className="dash-subtitle">
-                {caseSummary.status === 'closed'
-                  ? `This case is closed. Evidence is retained until ${caseSummary.evidence_retention_expires_at ? formatExecutorDate(caseSummary.evidence_retention_expires_at) : 'the retention window ends'}.`
-                  : 'This case is still pending activation. Return to the executor landing page to upload the death certificate.'}
-              </p>
+              <p className="dash-subtitle">{getExecutorActivationDescription(caseSummary)}</p>
             </div>
           </div>
+          {caseSummary.status === 'activation_pending' && caseSummary.activation_review_status !== 'not_requested' ? (
+            <div className="executor-task-readonly">
+              <div>
+                <span>Review status</span>
+                <strong>{getExecutorCaseStatusLabel(caseSummary)}</strong>
+              </div>
+              <div>
+                <span>Reason</span>
+                <strong>{formatExecutorReviewReason(caseSummary.activation_review_reason)}</strong>
+              </div>
+              <div>
+                <span>Requested</span>
+                <strong>{formatExecutorDate(caseSummary.activation_review_requested_at)}</strong>
+              </div>
+              <div>
+                <span>Updated</span>
+                <strong>{formatExecutorDate(caseSummary.activation_review_updated_at)}</strong>
+              </div>
+              <div>
+                <span>Review note</span>
+                <strong>{caseSummary.activation_review_note || 'Not provided'}</strong>
+              </div>
+            </div>
+          ) : null}
           <div className="inventory-actions-row">
             <Button type="button" variant="secondary" onClick={() => router.push('/executor')}>
               <ArrowLeft size={16} /> Back to Cases
@@ -179,6 +202,10 @@ export function ExecutorCaseWorkspaceScreen({ caseId }: ExecutorCaseWorkspaceScr
             {caseSummary.status === 'closed' ? (
               <Button type="button" onClick={() => router.push(`/executor/cases/${caseId}/report`)}>
                 <Printer size={16} /> View Closure Report
+              </Button>
+            ) : caseSummary.activation_review_status === 'rejected' ? (
+              <Button type="button" onClick={() => router.push('/executor')}>
+                <RotateCcw size={16} /> Upload Replacement Certificate
               </Button>
             ) : null}
           </div>

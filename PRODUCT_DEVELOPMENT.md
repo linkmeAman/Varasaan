@@ -40,9 +40,40 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
 - Frontend never handwrites request/response shapes; it consumes generated client/types only.
 - A phase is not complete until implementation, generated artifacts, verification, and docs land together.
 
+## Execution Controls (March 2026)
+
+- Completion gates are nested:
+  - `Current release complete`: Phase A sync, Phase A frontend, Phase B, and current-release staging validation are closed.
+  - `MVP complete`: current release plus `Quick wins`, Phase C, Phase D, and the first-paying-user launch checklist are closed.
+  - `Roadmap complete`: MVP plus Phase E and the post-Phase-E roadmap sequence are closed.
+  - `Project complete`: roadmap plus legal/compliance/business/ops sign-offs are closed with evidence.
+- Stream policy is strict:
+  - every completed stream lands on `main`
+  - every successor branch starts from refreshed `main`
+  - stale successor branches are not continued
+- Precondition before a stream starts:
+  - planning docs on `main` are reconciled
+  - the predecessor stream is already merged into `main`
+  - the stream scope matches the documented phase scope
+- Stop conditions are strict:
+  - do not start the next stream if contract artifacts are stale
+  - do not start the next stream if generated client/types are stale
+  - do not start the next stream if required verification is failing
+  - do not start the next stream if the root status docs disagree with implementation
+- Non-code evidence policy:
+  - launch, legal, compliance, and operational checklist items must carry owner, due date, and evidence or sign-off location before the project can be called complete
+
 ## Active Execution Sequence (2026)
 
-- Audit snapshot (2026-03-22): the pre-Phase-A baseline has been consolidated, and the Phase A backend hardening slice is implemented and verified on `codex/phase-a-backend`. The next action is the sync/public-contract stream, followed by the frontend executor-state work.
+- Audit snapshot (2026-03-22): the pre-Phase-A baseline has been consolidated, the Phase A backend hardening slice is implemented and verified on `codex/phase-a-backend`, the public Phase A contract artifacts are regenerated on `main`, and the executor review-state UX is implemented locally on `main`.
+- Completion framing (March 2026):
+  - Required for current release: Phase A sync, Phase A frontend, and Phase B checkout/staging validation.
+  - Required for MVP completion: the remaining Phase 2 collaboration/crypto slices plus the first-paying-user launch checklist.
+  - Later roadmap only: Phase E B2B foundations and the broader Phase 3/4 expansion items.
+- Immediate release focus (2026-03-22):
+  - Execute the updated executor Playwright review-state coverage in a real runner/staging environment.
+  - Run the Phase B payment API sufficiency review.
+  - If the existing payment surface is sufficient, skip Phase B backend/sync changes and move directly to the checkout frontend work from current `main`.
 - Phase A - After-Loss Hardening Finish:
   - Add death-certificate metadata stripping, a risk-based manual review state, internal review tooling, review-metadata fields on case summaries, and end-to-end hardening coverage.
   - Exit gate: every activation resolves to `active`, `pending review`, or `rejected review` without manual DB intervention.
@@ -312,6 +343,9 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
 
 ## 📋 Legal & Compliance Checklist (One-Time + Ongoing)
 
+Tracking rule:
+- Every item below must record an owner, due date, approval authority where relevant, and an evidence/sign-off location before it is treated as closed.
+
 ### One-time Setup
 - [ ] Company incorporated (Private Limited recommended for B2B credibility)
 - [ ] GST registration
@@ -342,6 +376,9 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
 ---
 
 ## 🚀 Launch Checklist (Before First Paying User)
+
+Tracking rule:
+- Each launch item must record who validated it, when it was validated, and where the evidence lives.
 
 - [ ] Privacy Policy live
 - [ ] Terms of Service live
