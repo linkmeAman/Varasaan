@@ -4,6 +4,45 @@
 - Scope: frontend-backend contract sync for `packages/shared/openapi/openapi.yaml`
 - Result: contract, generated frontend client, cookie-auth flow, and backend route coverage are aligned for planning-mode and executor case flows.
 
+## Sync / QA / Docs Operating Model
+
+- Sync stream owns `PROGRESS_CHECKLIST.md`, `PRODUCT_DEVELOPMENT.md`, `CHANGELOG.md`, and `INTEGRATION_CHECKLIST.md`.
+- Backend is the source of truth for public interface changes.
+- `packages/shared/openapi/openapi.yaml` must be updated before any generated artifact is regenerated.
+- Frontend consumes generated request/response types only; it does not handwrite contract shapes.
+- Internal-only routes stay out of the public OpenAPI surface.
+- Phase completion is blocked if implementation, contract, generated artifacts, and docs disagree.
+
+## Local Verification Entry Point
+
+- Preferred local command:
+  - `npm run verify:sync`
+- Add phase-specific backend tests when needed:
+  - `npm run verify:sync -- --backend-test backend/tests/test_api_integration_flows.py`
+  - `npm run verify:sync -- --backend-test backend/tests/test_api_integration_flows.py --backend-test backend/tests/test_case_flows.py`
+- Optional Playwright execution remains available through `npm run verify:sync -- --run-e2e --playwright-spec <spec>` or the existing frontend e2e commands, but a real runner/staging pass is still required for high-confidence frontend validation.
+
+## Per-Phase Verification Checklist
+
+- Pull the backend branch after API or schema changes.
+- Update `packages/shared/openapi/openapi.yaml` first, then regenerate:
+  - `packages/shared/openapi/openapi.generated.json`
+  - `frontend/src/lib/generated/api-client.ts`
+  - `frontend/src/api/openapi-types.ts`
+- Run:
+  - `python -m pytest backend/tests/test_contract_sync.py`
+  - relevant backend integration tests for the phase
+  - `npm run typecheck`
+  - `npm run lint`
+- If frontend behavior changes for users, confirm the relevant Playwright spec is updated.
+- Update `PROGRESS_CHECKLIST.md`, `PRODUCT_DEVELOPMENT.md`, `CHANGELOG.md`, and `INTEGRATION_CHECKLIST.md` in the same phase.
+
+## Current Contract Boundaries
+
+- The public contract currently covers planning-mode and single-executor after-loss flows.
+- Internal manual-review endpoints remain intentionally excluded from public OpenAPI until Phase A lands its public case-summary metadata changes.
+- Family-workspace, crypto, and B2B payloads are intentionally absent until their respective delivery phases start.
+
 ## Endpoint-by-Endpoint Status
 
 | Method | Path | Operation | Request Payload | Success Payload | Verification | Status |
@@ -66,6 +105,6 @@
 ## Known Gaps
 
 - Hidden mock-storage routes under `/api/v1/testing/*` are test-only and intentionally excluded from public OpenAPI.
-- Manual review and multi-participant case collaboration are intentionally excluded from the current case contract surface.
+- Manual review internals and multi-participant case collaboration are intentionally excluded from the current public case contract surface until their execution phases land.
 - Live Razorpay/Postmark validation still depends on staging credentials and must be executed as part of the launch runbook.
 - Alert routing is operationally validated through staging smoke checks; it is not exercised by unit or contract tests.
