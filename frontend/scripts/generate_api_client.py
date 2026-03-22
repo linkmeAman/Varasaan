@@ -428,7 +428,7 @@ def main() -> None:
         )
 
     json_output_path = repo_root / "packages" / "shared" / "openapi" / "openapi.generated.json"
-    json_output_path.write_text(json.dumps(spec, indent=2), encoding="utf-8")
+    json_output_path.write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
 
     output_path = repo_root / "frontend" / "src" / "lib" / "generated" / "api-client.ts"
     output_path.parent.mkdir(parents=True, exist_ok=True)
