@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.models import CaseStatus, CaseTaskStatus, RecurringPaymentRail
+from app.models import CaseActivationReviewStatus, CaseStatus, CaseTaskStatus, RecurringPaymentRail
 
 DEATH_CERTIFICATE_CONTENT_TYPE = "application/pdf"
 DEATH_CERTIFICATE_DOC_TYPE = "death_certificate"
@@ -33,6 +33,11 @@ class CaseSummaryResponse(BaseModel):
     owner_name: str
     owner_email: str
     status: CaseStatus
+    activation_review_status: CaseActivationReviewStatus = CaseActivationReviewStatus.NOT_REQUESTED
+    activation_review_reason: str | None = None
+    activation_review_note: str | None = None
+    activation_review_requested_at: datetime | None = None
+    activation_review_updated_at: datetime | None = None
     death_certificate_document_id: str | None = None
     death_certificate_version_id: str | None = None
     activated_at: datetime | None = None
@@ -46,7 +51,7 @@ class CaseSummaryResponse(BaseModel):
 
 class CaseActivationUploadInitRequest(BaseModel):
     size_bytes: int = Field(gt=0, le=DEATH_CERTIFICATE_MAX_BYTES)
-    content_type: Literal[DEATH_CERTIFICATE_CONTENT_TYPE]
+    content_type: Literal["application/pdf"]
     sha256: str | None = None
 
 
@@ -59,12 +64,41 @@ class CaseActivationUploadInitResponse(BaseModel):
     upload_url_expires_in_seconds: int
     plaintext_dek_b64: str
     kms_key_id: str
-    doc_type: Literal[DEATH_CERTIFICATE_DOC_TYPE] = DEATH_CERTIFICATE_DOC_TYPE
+    doc_type: Literal["death_certificate"] = "death_certificate"
 
 
 class CaseActivationConfirmRequest(BaseModel):
     document_id: str
     version_id: str
+
+
+class InternalCaseReviewResponse(BaseModel):
+    id: str
+    owner_user_id: str
+    owner_name: str
+    owner_email: str
+    status: CaseStatus
+    activation_review_status: CaseActivationReviewStatus
+    activation_review_reason: str | None = None
+    activation_review_note: str | None = None
+    activation_review_requested_at: datetime | None = None
+    activation_review_updated_at: datetime | None = None
+    death_certificate_document_id: str | None = None
+    death_certificate_version_id: str | None = None
+    death_certificate_sanitized_at: datetime | None = None
+    death_certificate_metadata_stripped: bool = False
+    activated_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class InternalCaseReviewApproveRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=500)
+
+
+class InternalCaseReviewRejectRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=120)
+    note: str | None = Field(default=None, max_length=500)
 
 
 class CaseTaskResponse(BaseModel):
@@ -112,7 +146,7 @@ class CaseTaskEvidenceUploadInitResponse(BaseModel):
     upload_url_expires_in_seconds: int
     plaintext_dek_b64: str
     kms_key_id: str
-    doc_type: Literal[CASE_TASK_EVIDENCE_DOC_TYPE] = CASE_TASK_EVIDENCE_DOC_TYPE
+    doc_type: Literal["case_task_evidence"] = "case_task_evidence"
 
 
 class CaseTaskEvidenceResponse(BaseModel):

@@ -52,6 +52,55 @@ def _auth_header(access_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {access_token}"}
 
 
+def _internal_header() -> dict[str, str]:
+    return {"X-Internal-Api-Key": "dev-internal-api-key"}
+
+
+def _build_pdf_bytes(*, title: str | None = None, author: str | None = None) -> bytes:
+    metadata_fields: list[str] = []
+    if title:
+        metadata_fields.append(f"/Title ({title})")
+    if author:
+        metadata_fields.append(f"/Author ({author})")
+
+    info_object = "<< " + " ".join(metadata_fields) + " >>" if metadata_fields else "<< >>"
+    stream = "BT /F1 12 Tf 72 100 Td (Death Certificate) Tj ET"
+    pdf = "\n".join(
+        [
+            "%PDF-1.4",
+            "1 0 obj",
+            "<< /Type /Catalog /Pages 2 0 R >>",
+            "endobj",
+            "2 0 obj",
+            "<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+            "endobj",
+            "3 0 obj",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 144] /Contents 4 0 R >>",
+            "endobj",
+            "4 0 obj",
+            f"<< /Length {len(stream)} >>",
+            "stream",
+            stream,
+            "endstream",
+            "endobj",
+            "5 0 obj",
+            info_object,
+            "endobj",
+            "trailer",
+            "<< /Root 1 0 R /Info 5 0 R >>",
+            "%%EOF",
+            "",
+        ]
+    )
+    return pdf.encode("utf-8")
+
+
+def _store_uploaded_certificate_bytes(test_context, init_payload: dict, pdf_bytes: bytes) -> None:
+    from app.core.config import get_settings
+
+    test_context["fake_aws"].uploaded[(get_settings().s3_bucket_documents, init_payload["object_key"])] = pdf_bytes
+
+
 async def _signup_and_login(test_context, *, email: str, password: str) -> dict:
     client = test_context["client"]
     session_factory = test_context["session_factory"]
@@ -222,6 +271,7 @@ async def _activate_case_with_inventory(
         },
     )
     assert init_upload.status_code == 201, init_upload.text
+    _store_uploaded_certificate_bytes(test_context, init_upload.json(), _build_pdf_bytes())
 
     activate = await client.post(
         f"/api/v1/cases/{context['case_id']}/activate",
@@ -377,6 +427,7 @@ async def test_case_activation_generates_one_task_per_inventory_account_and_is_i
     )
     assert init_upload.status_code == 201, init_upload.text
     upload_payload = init_upload.json()
+    _store_uploaded_certificate_bytes(test_context, upload_payload, _build_pdf_bytes())
 
     activate = await client.post(
         f"/api/v1/cases/{context['case_id']}/activate",
@@ -388,6 +439,7 @@ async def test_case_activation_generates_one_task_per_inventory_account_and_is_i
     )
     assert activate.status_code == 200, activate.text
     assert activate.json()["status"] == "active"
+    assert activate.json()["activation_review_status"] == "not_requested"
     assert activate.json()["task_count"] == 2
 
     third_account = await client.post(
@@ -425,6 +477,217 @@ async def test_case_activation_generates_one_task_per_inventory_account_and_is_i
     async with session_factory() as db:
         stored_tasks = (await db.execute(select(CaseTask).where(CaseTask.case_id == context["case_id"]))).scalars().all()
         assert len(stored_tasks) == 2
+
+
+@pytest.mark.asyncio
+async def test_case_activation_with_metadata_is_queued_for_manual_review_and_can_be_approved(test_context):
+    client = test_context["client"]
+    context = await _create_executor_case(
+        test_context,
+        owner_email="review-owner@example.com",
+        executor_email="review-executor@example.com",
+    )
+    await _create_inventory_account(
+        client,
+        access_token=context["owner"]["access_token"],
+        platform="Gmail",
+        category="communication",
+        importance_level=5,
+    )
+
+    init_upload = await client.post(
+        f"/api/v1/cases/{context['case_id']}/death-certificate/uploads/init",
+        headers=_auth_header(context["executor"]["access_token"]),
+        json={
+            "size_bytes": 2048,
+            "content_type": "application/pdf",
+            "sha256": None,
+        },
+    )
+    assert init_upload.status_code == 201, init_upload.text
+    upload_payload = init_upload.json()
+    _store_uploaded_certificate_bytes(
+        test_context,
+        upload_payload,
+        _build_pdf_bytes(title="Executor Copy", author="Scanner Device"),
+    )
+
+    activate = await client.post(
+        f"/api/v1/cases/{context['case_id']}/activate",
+        headers=_auth_header(context["executor"]["access_token"]),
+        json={
+            "document_id": upload_payload["document_id"],
+            "version_id": upload_payload["version_id"],
+        },
+    )
+    assert activate.status_code == 200, activate.text
+    activation_body = activate.json()
+    assert activation_body["status"] == "activation_pending"
+    assert activation_body["activation_review_status"] == "pending_review"
+    assert activation_body["activation_review_reason"] == "death_certificate_metadata_detected"
+    assert activation_body["activation_review_note"] is not None
+
+    pending_reviews = await client.get("/api/v1/internal/case-reviews", headers=_internal_header())
+    assert pending_reviews.status_code == 200, pending_reviews.text
+    queue = pending_reviews.json()
+    assert [row["id"] for row in queue] == [context["case_id"]]
+    assert queue[0]["death_certificate_metadata_stripped"] is True
+    assert queue[0]["death_certificate_sanitized_at"] is not None
+
+    stored_pdf = test_context["fake_aws"].uploaded[("varasaan-documents", upload_payload["object_key"])]
+    assert b"Executor Copy" not in stored_pdf
+    assert b"Scanner Device" not in stored_pdf
+
+    tasks_before_approval = await client.get(
+        f"/api/v1/cases/{context['case_id']}/tasks",
+        headers=_auth_header(context["executor"]["access_token"]),
+    )
+    assert tasks_before_approval.status_code == 200, tasks_before_approval.text
+    assert tasks_before_approval.json() == []
+
+    approve = await client.post(
+        f"/api/v1/internal/case-reviews/{context['case_id']}/approve",
+        headers=_internal_header(),
+        json={"note": "Verified against sanitized upload."},
+    )
+    assert approve.status_code == 200, approve.text
+    approved_body = approve.json()
+    assert approved_body["status"] == "active"
+    assert approved_body["activation_review_status"] == "approved"
+
+    list_tasks = await client.get(
+        f"/api/v1/cases/{context['case_id']}/tasks",
+        headers=_auth_header(context["executor"]["access_token"]),
+    )
+    assert list_tasks.status_code == 200, list_tasks.text
+    assert len(list_tasks.json()) == 1
+
+    activity_response = await client.get(
+        f"/api/v1/cases/{context['case_id']}/activity",
+        headers=_auth_header(context["executor"]["access_token"]),
+    )
+    assert activity_response.status_code == 200, activity_response.text
+    event_types = [event["event_type"] for event in activity_response.json()]
+    assert "case_review_queued" in event_types
+    assert "case_review_approved" in event_types
+    assert "case_activated" in event_types
+
+
+@pytest.mark.asyncio
+async def test_rejected_manual_review_allows_replacement_upload_and_clean_activation(test_context):
+    client = test_context["client"]
+    context = await _create_executor_case(
+        test_context,
+        owner_email="replacement-owner@example.com",
+        executor_email="replacement-executor@example.com",
+    )
+    await _create_inventory_account(
+        client,
+        access_token=context["owner"]["access_token"],
+        platform="Dropbox",
+        category="storage",
+        importance_level=4,
+    )
+
+    first_upload = await client.post(
+        f"/api/v1/cases/{context['case_id']}/death-certificate/uploads/init",
+        headers=_auth_header(context["executor"]["access_token"]),
+        json={
+            "size_bytes": 2048,
+            "content_type": "application/pdf",
+            "sha256": None,
+        },
+    )
+    assert first_upload.status_code == 201, first_upload.text
+    first_payload = first_upload.json()
+    _store_uploaded_certificate_bytes(
+        test_context,
+        first_payload,
+        _build_pdf_bytes(title="Rejected Copy", author="Phone Scanner"),
+    )
+
+    first_activate = await client.post(
+        f"/api/v1/cases/{context['case_id']}/activate",
+        headers=_auth_header(context["executor"]["access_token"]),
+        json={
+            "document_id": first_payload["document_id"],
+            "version_id": first_payload["version_id"],
+        },
+    )
+    assert first_activate.status_code == 200, first_activate.text
+    assert first_activate.json()["activation_review_status"] == "pending_review"
+
+    reject = await client.post(
+        f"/api/v1/internal/case-reviews/{context['case_id']}/reject",
+        headers=_internal_header(),
+        json={
+            "reason": "metadata_mismatch",
+            "note": "Upload a replacement certificate without embedded editor metadata.",
+        },
+    )
+    assert reject.status_code == 200, reject.text
+    reject_body = reject.json()
+    assert reject_body["status"] == "activation_pending"
+    assert reject_body["activation_review_status"] == "rejected"
+    assert reject_body["activation_review_reason"] == "metadata_mismatch"
+    assert "replacement" in reject_body["activation_review_note"].lower()
+
+    same_version_retry = await client.post(
+        f"/api/v1/cases/{context['case_id']}/activate",
+        headers=_auth_header(context["executor"]["access_token"]),
+        json={
+            "document_id": first_payload["document_id"],
+            "version_id": first_payload["version_id"],
+        },
+    )
+    assert same_version_retry.status_code == 200, same_version_retry.text
+    assert same_version_retry.json()["activation_review_status"] == "rejected"
+
+    replacement_upload = await client.post(
+        f"/api/v1/cases/{context['case_id']}/death-certificate/uploads/init",
+        headers=_auth_header(context["executor"]["access_token"]),
+        json={
+            "size_bytes": 2048,
+            "content_type": "application/pdf",
+            "sha256": None,
+        },
+    )
+    assert replacement_upload.status_code == 201, replacement_upload.text
+    replacement_payload = replacement_upload.json()
+    assert replacement_payload["version_id"] != first_payload["version_id"]
+    _store_uploaded_certificate_bytes(test_context, replacement_payload, _build_pdf_bytes())
+
+    replacement_activate = await client.post(
+        f"/api/v1/cases/{context['case_id']}/activate",
+        headers=_auth_header(context["executor"]["access_token"]),
+        json={
+            "document_id": replacement_payload["document_id"],
+            "version_id": replacement_payload["version_id"],
+        },
+    )
+    assert replacement_activate.status_code == 200, replacement_activate.text
+    replacement_body = replacement_activate.json()
+    assert replacement_body["status"] == "active"
+    assert replacement_body["activation_review_status"] == "not_requested"
+    assert replacement_body["activation_review_reason"] is None
+    assert replacement_body["activation_review_note"] is None
+
+    list_tasks = await client.get(
+        f"/api/v1/cases/{context['case_id']}/tasks",
+        headers=_auth_header(context["executor"]["access_token"]),
+    )
+    assert list_tasks.status_code == 200, list_tasks.text
+    assert len(list_tasks.json()) == 1
+
+    activity_response = await client.get(
+        f"/api/v1/cases/{context['case_id']}/activity",
+        headers=_auth_header(context["executor"]["access_token"]),
+    )
+    assert activity_response.status_code == 200, activity_response.text
+    event_types = [event["event_type"] for event in activity_response.json()]
+    assert "case_review_queued" in event_types
+    assert "case_review_rejected" in event_types
+    assert "case_activated" in event_types
 
 
 @pytest.mark.asyncio
@@ -1143,4 +1406,4 @@ async def test_case_evidence_retention_cleanup_purges_expired_rows(test_context)
         ).scalars().all()
         assert "case_evidence_retention_purged" in [log.action for log in case_logs]
 
-    assert test_context["fake_aws"].uploaded == {}
+    assert ("varasaan-documents", document_version.object_key) not in test_context["fake_aws"].uploaded

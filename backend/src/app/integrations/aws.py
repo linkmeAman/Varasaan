@@ -84,10 +84,10 @@ class AwsStorageCryptoService:
     async def generate_data_key(self, *, encryption_context: dict[str, str]) -> EnvelopeDataKey:
         if self._is_mock_mode():
             _ = encryption_context
-            plaintext = secrets.token_bytes(32)
-            encrypted = b"mock-encrypted-" + plaintext[:8]
+            mock_plaintext = secrets.token_bytes(32)
+            encrypted = b"mock-encrypted-" + mock_plaintext[:8]
             return EnvelopeDataKey(
-                plaintext_key_b64=base64.b64encode(plaintext).decode("ascii"),
+                plaintext_key_b64=base64.b64encode(mock_plaintext).decode("ascii"),
                 encrypted_key_b64=base64.b64encode(encrypted).decode("ascii"),
                 kms_key_id=self._settings.kms_key_id,
             )
@@ -98,10 +98,10 @@ class AwsStorageCryptoService:
             KeySpec="AES_256",
             EncryptionContext=encryption_context,
         )
-        plaintext: bytes = response["Plaintext"]
+        plaintext_key: bytes = response["Plaintext"]
         encrypted_blob: bytes = response["CiphertextBlob"]
         return EnvelopeDataKey(
-            plaintext_key_b64=base64.b64encode(plaintext).decode("ascii"),
+            plaintext_key_b64=base64.b64encode(plaintext_key).decode("ascii"),
             encrypted_key_b64=base64.b64encode(encrypted_blob).decode("ascii"),
             kms_key_id=str(response.get("KeyId", self._settings.kms_key_id)),
         )
@@ -159,6 +159,29 @@ class AwsStorageCryptoService:
             Params=params,
             ExpiresIn=expires_seconds,
         )
+
+    async def download_bytes(
+        self,
+        *,
+        bucket: str,
+        object_key: str,
+    ) -> bytes | None:
+        if self._is_mock_mode():
+            return self._mock_objects.get((bucket, object_key))
+
+        try:
+            response = await asyncio.to_thread(
+                self._s3_or_create().get_object,
+                Bucket=bucket,
+                Key=object_key,
+            )
+        except Exception:
+            return None
+
+        body = response.get("Body")
+        if body is None:
+            return None
+        return await asyncio.to_thread(body.read)
 
     async def upload_bytes(
         self,

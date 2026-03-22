@@ -17,6 +17,9 @@ CASE_REPORT_VIEWED_ACTION = "case_report_viewed"
 CASE_CONTACTS_NOTIFIED_ACTION = "case_contacts_notified"
 CASE_CLOSED_ACTION = "case_closed"
 CASE_EVIDENCE_RETENTION_PURGED_ACTION = "case_evidence_retention_purged"
+CASE_REVIEW_QUEUED_ACTION = "case_review_queued"
+CASE_REVIEW_APPROVED_ACTION = "case_review_approved"
+CASE_REVIEW_REJECTED_ACTION = "case_review_rejected"
 
 
 def hash_ip(ip: str | None) -> str | None:
@@ -251,6 +254,71 @@ async def record_case_closed(
             "retained_evidence_count": retained_evidence_count,
             "evidence_retention_expires_at": evidence_retention_expires_at.isoformat() if evidence_retention_expires_at else None,
         },
+    )
+
+
+async def record_case_review_queued(
+    db: AsyncSession,
+    *,
+    case_id: str,
+    actor_id: str | None,
+    request_id: str | None,
+    client_ip: str | None,
+    reason: str,
+    note: str | None,
+) -> None:
+    await record_case_activity(
+        db,
+        case_id=case_id,
+        action=CASE_REVIEW_QUEUED_ACTION,
+        actor_id=actor_id,
+        request_id=request_id,
+        client_ip=client_ip,
+        message="Case activation was queued for manual review.",
+        metadata={"reason": reason, "note": note},
+    )
+
+
+async def record_case_review_approved(
+    db: AsyncSession,
+    *,
+    case_id: str,
+    actor_id: str | None,
+    request_id: str | None,
+    client_ip: str | None,
+    note: str | None,
+) -> None:
+    await record_case_activity(
+        db,
+        case_id=case_id,
+        action=CASE_REVIEW_APPROVED_ACTION,
+        actor_id=actor_id,
+        request_id=request_id,
+        client_ip=client_ip,
+        message="Case activation manual review was approved.",
+        metadata={"note": note},
+    )
+
+
+async def record_case_review_rejected(
+    db: AsyncSession,
+    *,
+    case_id: str,
+    actor_id: str | None,
+    request_id: str | None,
+    client_ip: str | None,
+    reason: str,
+    note: str | None,
+) -> None:
+    await record_case_activity(
+        db,
+        case_id=case_id,
+        action=CASE_REVIEW_REJECTED_ACTION,
+        actor_id=actor_id,
+        request_id=request_id,
+        client_ip=client_ip,
+        message="Case activation manual review was rejected.",
+        metadata={"reason": reason, "note": note},
     )
 
 

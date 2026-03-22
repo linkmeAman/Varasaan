@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
     debug: bool = False
     openapi_contract_path: str = "packages/shared/openapi/openapi.generated.json"
+    internal_api_key: str = "dev-internal-api-key"
 
     database_url: str = "postgresql+asyncpg://varasaan:varasaan@localhost:5432/varasaan"
     redis_url: str = "redis://localhost:6379/0"

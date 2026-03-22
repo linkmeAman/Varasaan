@@ -33,12 +33,18 @@ class FakeAwsService:
         target_bucket = bucket or "documents"
         return f"https://s3.local/{target_bucket}/{object_key}?download=1&expires={expires_seconds}"
 
+    async def download_bytes(self, *, bucket: str, object_key: str) -> bytes | None:
+        return self.uploaded.get((bucket, object_key))
+
     async def upload_bytes(self, *, bucket: str, object_key: str, payload: bytes, content_type: str = "application/octet-stream") -> None:
         _ = content_type
         self.uploaded[(bucket, object_key)] = payload
 
     async def delete_object(self, *, bucket: str, object_key: str) -> None:
         self.uploaded.pop((bucket, object_key), None)
+
+    def get_mock_object(self, *, bucket: str, object_key: str) -> bytes | None:
+        return self.uploaded.get((bucket, object_key))
 
 
 class FakeMalwareClient:

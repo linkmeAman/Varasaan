@@ -1,4 +1,17 @@
-from app.api.routes import auth, cases, documents, exports, heartbeats, inventory, legal, packets, payments, testing, trusted_contacts
+from app.api.routes import (
+    auth,
+    cases,
+    documents,
+    exports,
+    heartbeats,
+    internal_case_reviews,
+    inventory,
+    legal,
+    packets,
+    payments,
+    testing,
+    trusted_contacts,
+)
 
 __all__ = [
     "auth",
@@ -6,6 +19,7 @@ __all__ = [
     "documents",
     "exports",
     "heartbeats",
+    "internal_case_reviews",
     "inventory",
     "legal",
     "packets",

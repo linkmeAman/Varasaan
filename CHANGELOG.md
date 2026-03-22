@@ -4,6 +4,8 @@ All notable changes to this repository are documented in this file.
 
 ## Unreleased
 
+- Audited the current delivery state, updated the roadmap/checklist docs for the consolidated pre-Phase-A baseline, and rewrote the next-step plan around the Phase A sync stream followed by the frontend stream.
+- Added the Phase A backend hardening slice: death-certificate metadata stripping, risk-based manual review state, hidden internal review endpoints, review metadata on case summaries, and regression coverage for clean, queued, approved, rejected, and replacement-upload activation paths.
 - Documented the synchronized multi-phase delivery model, added a root `npm run verify:sync` entrypoint for the sync stream, and expanded the PR template to require contract/doc alignment across phase work.
 - Added the first after-loss foundation slice: executor trusted-contact designation, pending and active case lifecycle, case-scoped death-certificate activation, task snapshot generation, executor workspace routes, and synced OpenAPI/frontend client artifacts.
 - Added the Phase 2.3 executor evidence/report slice: task-scoped evidence uploads and downloads, malware-scan-gated clean evidence references, activity timeline entries, and a live printable closure report view.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from collections import Counter, defaultdict
@@ -16,6 +17,7 @@ from app.integrations.email import get_email_client
 from app.models import (
     AuditLog,
     Case,
+    CaseActivationReviewStatus,
     CaseParticipant,
     CaseParticipantRole,
     CaseStatus,
@@ -37,6 +39,7 @@ from app.models import (
 from app.schemas.cases import (
     CASE_TASK_EVIDENCE_CONTENT_TYPES,
     CASE_TASK_EVIDENCE_DOC_TYPE,
+    DEATH_CERTIFICATE_CONTENT_TYPE,
     DEATH_CERTIFICATE_DOC_TYPE,
     CaseActivityEventResponse,
     CaseBleedStopperCaseSummaryResponse,
@@ -56,10 +59,18 @@ from app.services.case_activity import (
     record_case_evidence_retention_purged,
     record_case_evidence_upload_initialized,
     record_case_report_viewed,
+    record_case_review_approved,
+    record_case_review_queued,
+    record_case_review_rejected,
     record_case_task_updated,
 )
+from app.services.pdf_sanitizer import sanitize_pdf_metadata
 
 TERMINAL_CASE_TASK_STATUSES = {CaseTaskStatus.RESOLVED, CaseTaskStatus.ESCALATED}
+DEATH_CERTIFICATE_REVIEW_REASON_METADATA_STRIPPED = "death_certificate_metadata_detected"
+DEATH_CERTIFICATE_REVIEW_NOTE_METADATA_STRIPPED = (
+    "Certificate metadata was removed during activation checks and the case now requires manual review."
+)
 logger = logging.getLogger(__name__)
 
 
@@ -266,9 +277,9 @@ async def upsert_case_for_executor_contact(
             CaseParticipant.role == CaseParticipantRole.EXECUTOR,
         )
     )
-    for participant in participants_result.scalars().all():
-        if participant.trusted_contact_id != trusted_contact.id:
-            await db.delete(participant)
+    for existing_participant in participants_result.scalars().all():
+        if existing_participant.trusted_contact_id != trusted_contact.id:
+            await db.delete(existing_participant)
 
     participant_result = await db.execute(
         select(CaseParticipant).where(
@@ -276,7 +287,7 @@ async def upsert_case_for_executor_contact(
             CaseParticipant.trusted_contact_id == trusted_contact.id,
         )
     )
-    participant = participant_result.scalars().first()
+    participant: CaseParticipant | None = participant_result.scalars().first()
     if participant is None:
         participant = CaseParticipant(
             case_id=case.id,
@@ -355,6 +366,8 @@ async def init_case_death_certificate_upload(
 ):
     if case.status == CaseStatus.CLOSED:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Closed cases cannot be modified")
+    if case.status == CaseStatus.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Active cases do not accept replacement death certificates")
 
     upload_request = UploadInitRequest(
         doc_type=DEATH_CERTIFICATE_DOC_TYPE,
@@ -371,6 +384,7 @@ async def init_case_death_certificate_upload(
 
     case.death_certificate_document_id = result.document.id
     case.death_certificate_version_id = result.version.id
+    _reset_activation_review_state(case)
     await db.flush()
     return result
 
@@ -386,6 +400,47 @@ def _validate_case_document_reference(case: Case, document: Document | None, ver
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Document version does not belong to the referenced document")
     if document.doc_type != DEATH_CERTIFICATE_DOC_TYPE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid death certificate document type")
+
+
+def _reset_activation_review_state(case: Case) -> None:
+    case.activation_review_status = CaseActivationReviewStatus.NOT_REQUESTED
+    case.activation_review_reason = None
+    case.activation_review_note = None
+    case.activation_review_requested_at = None
+    case.activation_review_updated_at = None
+    case.death_certificate_sanitized_at = None
+    case.death_certificate_metadata_stripped = False
+
+
+async def _sanitize_case_death_certificate(
+    db: AsyncSession,
+    *,
+    case: Case,
+    version: DocumentVersion,
+) -> bool:
+    settings = get_settings()
+    payload = await get_aws_storage_crypto_service().download_bytes(
+        bucket=settings.s3_bucket_documents,
+        object_key=version.object_key,
+    )
+    if payload is None:
+        return False
+
+    sanitized_payload, metadata_stripped = sanitize_pdf_metadata(payload)
+    case.death_certificate_sanitized_at = datetime.now(UTC)
+    case.death_certificate_metadata_stripped = metadata_stripped
+
+    if sanitized_payload != payload:
+        await get_aws_storage_crypto_service().upload_bytes(
+            bucket=settings.s3_bucket_documents,
+            object_key=version.object_key,
+            payload=sanitized_payload,
+            content_type=DEATH_CERTIFICATE_CONTENT_TYPE,
+        )
+        version.sha256 = hashlib.sha256(sanitized_payload).hexdigest()
+
+    await db.flush()
+    return metadata_stripped
 
 
 async def _case_task_count(db: AsyncSession, *, case_id: str) -> int:
@@ -497,43 +552,47 @@ async def _seed_case_tasks_from_inventory(db: AsyncSession, *, case: Case) -> No
     await db.flush()
 
 
-async def activate_case(
+async def _queue_case_for_manual_review(
     db: AsyncSession,
     *,
     case: Case,
-    document_id: str,
-    version_id: str,
-    actor_id: str | None = None,
-    request_id: str | None = None,
-    client_ip: str | None = None,
+    actor_id: str | None,
+    request_id: str | None,
+    client_ip: str | None,
+    reason: str,
+    note: str | None,
 ) -> Case:
-    if case.status == CaseStatus.CLOSED:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Closed cases cannot be reactivated")
+    now = datetime.now(UTC)
+    case.status = CaseStatus.ACTIVATION_PENDING
+    case.activation_review_status = CaseActivationReviewStatus.PENDING_REVIEW
+    case.activation_review_reason = reason
+    case.activation_review_note = note
+    case.activation_review_requested_at = now
+    case.activation_review_updated_at = now
+    await db.flush()
+    await record_case_review_queued(
+        db,
+        case_id=case.id,
+        actor_id=actor_id,
+        request_id=request_id,
+        client_ip=client_ip,
+        reason=reason,
+        note=note,
+    )
+    return case
 
-    document = await db.get(Document, document_id)
-    version = await db.get(DocumentVersion, version_id)
-    _validate_case_document_reference(case, document, version)
 
-    if (
-        document.state != DocumentState.ACTIVE
-        or version.state != DocumentState.ACTIVE
-        or document.current_version_id != version.id
-    ):
-        await document_service.orchestrate_malware_scan(db, version.id)
-        document = await db.get(Document, document_id)
-        version = await db.get(DocumentVersion, version_id)
-        _validate_case_document_reference(case, document, version)
-
-    if (
-        document.state != DocumentState.ACTIVE
-        or version.state != DocumentState.ACTIVE
-        or document.current_version_id != version.id
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Death certificate must complete document validation before activation",
-        )
-
+async def _finalize_case_activation(
+    db: AsyncSession,
+    *,
+    case: Case,
+    document: Document,
+    version: DocumentVersion,
+    actor_id: str | None,
+    request_id: str | None,
+    client_ip: str | None,
+    review_status: CaseActivationReviewStatus,
+) -> Case:
     was_active = case.status == CaseStatus.ACTIVE and case.activated_at is not None
     should_seed_tasks = case.activated_at is None or await _case_task_count(db, case_id=case.id) == 0
 
@@ -542,6 +601,16 @@ async def activate_case(
     case.status = CaseStatus.ACTIVE
     case.death_certificate_document_id = document.id
     case.death_certificate_version_id = version.id
+    case.activation_review_status = review_status
+    if review_status == CaseActivationReviewStatus.NOT_REQUESTED:
+        case.activation_review_reason = None
+        case.activation_review_note = None
+        case.activation_review_requested_at = None
+        case.activation_review_updated_at = None
+    else:
+        case.activation_review_reason = None if review_status == CaseActivationReviewStatus.APPROVED else case.activation_review_reason
+        case.activation_review_note = None
+        case.activation_review_updated_at = datetime.now(UTC)
 
     if should_seed_tasks:
         await _seed_case_tasks_from_inventory(db, case=case)
@@ -565,6 +634,185 @@ async def activate_case(
             client_ip=client_ip,
             task_count=task_count,
         )
+    return case
+
+
+async def activate_case(
+    db: AsyncSession,
+    *,
+    case: Case,
+    document_id: str,
+    version_id: str,
+    actor_id: str | None = None,
+    request_id: str | None = None,
+    client_ip: str | None = None,
+) -> Case:
+    if case.status == CaseStatus.CLOSED:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Closed cases cannot be reactivated")
+
+    document = await db.get(Document, document_id)
+    version = await db.get(DocumentVersion, version_id)
+    _validate_case_document_reference(case, document, version)
+    assert document is not None
+    assert version is not None
+
+    if (
+        document.state != DocumentState.ACTIVE
+        or version.state != DocumentState.ACTIVE
+        or document.current_version_id != version.id
+    ):
+        await document_service.orchestrate_malware_scan(db, version.id)
+        document = await db.get(Document, document_id)
+        version = await db.get(DocumentVersion, version_id)
+        _validate_case_document_reference(case, document, version)
+        assert document is not None
+        assert version is not None
+
+    if (
+        document.state != DocumentState.ACTIVE
+        or version.state != DocumentState.ACTIVE
+        or document.current_version_id != version.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Death certificate must complete document validation before activation",
+        )
+
+    if (
+        case.activation_review_status == CaseActivationReviewStatus.PENDING_REVIEW
+        and case.death_certificate_document_id == document.id
+        and case.death_certificate_version_id == version.id
+    ):
+        return case
+    if (
+        case.activation_review_status == CaseActivationReviewStatus.REJECTED
+        and case.death_certificate_document_id == document.id
+        and case.death_certificate_version_id == version.id
+    ):
+        return case
+
+    metadata_stripped = await _sanitize_case_death_certificate(
+        db,
+        case=case,
+        version=version,
+    )
+    if metadata_stripped:
+        return await _queue_case_for_manual_review(
+            db,
+            case=case,
+            actor_id=actor_id,
+            request_id=request_id,
+            client_ip=client_ip,
+            reason=DEATH_CERTIFICATE_REVIEW_REASON_METADATA_STRIPPED,
+            note=DEATH_CERTIFICATE_REVIEW_NOTE_METADATA_STRIPPED,
+        )
+
+    return await _finalize_case_activation(
+        db,
+        case=case,
+        document=document,
+        version=version,
+        actor_id=actor_id,
+        request_id=request_id,
+        client_ip=client_ip,
+        review_status=CaseActivationReviewStatus.NOT_REQUESTED,
+    )
+
+
+async def list_internal_case_reviews(
+    db: AsyncSession,
+    *,
+    review_status: CaseActivationReviewStatus | None = CaseActivationReviewStatus.PENDING_REVIEW,
+) -> list[Case]:
+    statement = select(Case)
+    if review_status is not None:
+        statement = statement.where(Case.activation_review_status == review_status)
+    statement = statement.order_by(
+        Case.activation_review_requested_at.asc().nullslast(),
+        Case.updated_at.desc(),
+    )
+    result = await db.execute(statement)
+    return list(result.scalars().all())
+
+
+async def get_case_for_internal_review(db: AsyncSession, *, case_id: str) -> Case:
+    case = await db.get(Case, case_id)
+    if case is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+    return case
+
+
+async def approve_case_activation_review(
+    db: AsyncSession,
+    *,
+    case: Case,
+    actor_id: str | None = None,
+    request_id: str | None = None,
+    client_ip: str | None = None,
+    note: str | None = None,
+) -> Case:
+    if case.activation_review_status == CaseActivationReviewStatus.APPROVED and case.status == CaseStatus.ACTIVE:
+        return case
+    if case.activation_review_status != CaseActivationReviewStatus.PENDING_REVIEW:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Case is not pending manual review")
+
+    document = await db.get(Document, case.death_certificate_document_id)
+    version = await db.get(DocumentVersion, case.death_certificate_version_id)
+    _validate_case_document_reference(case, document, version)
+    assert document is not None
+    assert version is not None
+
+    await record_case_review_approved(
+        db,
+        case_id=case.id,
+        actor_id=actor_id,
+        request_id=request_id,
+        client_ip=client_ip,
+        note=_normalize_optional_text(note),
+    )
+    return await _finalize_case_activation(
+        db,
+        case=case,
+        document=document,
+        version=version,
+        actor_id=actor_id,
+        request_id=request_id,
+        client_ip=client_ip,
+        review_status=CaseActivationReviewStatus.APPROVED,
+    )
+
+
+async def reject_case_activation_review(
+    db: AsyncSession,
+    *,
+    case: Case,
+    reason: str,
+    note: str | None,
+    actor_id: str | None = None,
+    request_id: str | None = None,
+    client_ip: str | None = None,
+) -> Case:
+    if case.activation_review_status != CaseActivationReviewStatus.PENDING_REVIEW:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Case is not pending manual review")
+
+    normalized_reason = reason.strip()
+    normalized_note = _normalize_optional_text(note)
+    case.status = CaseStatus.ACTIVATION_PENDING
+    case.activated_at = None
+    case.activation_review_status = CaseActivationReviewStatus.REJECTED
+    case.activation_review_reason = normalized_reason
+    case.activation_review_note = normalized_note
+    case.activation_review_updated_at = datetime.now(UTC)
+    await db.flush()
+    await record_case_review_rejected(
+        db,
+        case_id=case.id,
+        actor_id=actor_id,
+        request_id=request_id,
+        client_ip=client_ip,
+        reason=normalized_reason,
+        note=normalized_note,
+    )
     return case
 
 
