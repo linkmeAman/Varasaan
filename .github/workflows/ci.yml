@@ -73,8 +73,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
 
-      - name: Regenerate frontend API types
-        run: npm --prefix frontend run generate:api
+      - name: Regenerate frontend API client
+        run: uv run --project backend python frontend/scripts/generate_api_client.py
+
+      - name: Regenerate frontend OpenAPI types
+        run: node frontend/scripts/generate-openapi-types.mjs
 
       - name: Check generated artifacts are committed
         run: |
