@@ -60,11 +60,13 @@ async def send_invite(db: AsyncSession, user_id: str, trusted_contact_id: str, f
     )
     existing = result.scalars().first()
 
-    if existing and not force_reissue and as_utc(existing.expires_at) > datetime.now(UTC):
+    existing_expires_at = as_utc(existing.expires_at) if existing else None
+    if existing and not force_reissue and existing_expires_at is not None and existing_expires_at > datetime.now(UTC):
         return _generic_invite_message(), None
 
     now = datetime.now(UTC)
-    if existing and existing.send_count >= 3 and (now - as_utc(existing.created_at)).total_seconds() < 86400:
+    existing_created_at = as_utc(existing.created_at) if existing else None
+    if existing and existing.send_count >= 3 and existing_created_at is not None and (now - existing_created_at).total_seconds() < 86400:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Invite resend limit reached")
 
     token = generate_token_secret()
@@ -99,7 +101,8 @@ async def accept_invite(db: AsyncSession, token: str) -> None:
     invite = result.scalars().first()
     if not invite or invite.revoked_at is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid invite")
-    if as_utc(invite.expires_at) < datetime.now(UTC):
+    invite_expires_at = as_utc(invite.expires_at)
+    if invite_expires_at is None or invite_expires_at < datetime.now(UTC):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invite expired")
 
     invite.used_at = datetime.now(UTC)

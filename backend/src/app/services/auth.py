@@ -44,6 +44,13 @@ def _hash_ip(ip: str | None) -> str | None:
     return hashlib.sha256(ip.encode("utf-8")).hexdigest()
 
 
+def _require_utc(value: datetime | None, *, detail: str) -> datetime:
+    normalized = as_utc(value)
+    if normalized is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+    return normalized
+
+
 async def create_user(db: AsyncSession, payload: SignupRequest, client_ip: str | None) -> tuple[User, str]:
     existing = await db.execute(select(User).where(User.email == payload.email.lower()))
     if existing.scalars().first():
@@ -108,7 +115,8 @@ async def verify_email(db: AsyncSession, token: str) -> None:
     user = result.scalars().first()
     if not user or not user.email_verification_expires_at:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
-    if as_utc(user.email_verification_expires_at) < datetime.now(UTC):
+    email_verification_expires_at = _require_utc(user.email_verification_expires_at, detail="Invalid token")
+    if email_verification_expires_at < datetime.now(UTC):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token expired")
 
     user.email_verified = True
@@ -148,7 +156,8 @@ async def refresh_session(db: AsyncSession, refresh_token: str) -> tuple[str, da
     if session.revoked_at is not None:
         await revoke_all_sessions(db, session.user_id)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session revoked")
-    if as_utc(session.expires_at) < datetime.now(UTC):
+    session_expires_at = _require_utc(session.expires_at, detail="Invalid session")
+    if session_expires_at < datetime.now(UTC):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
 
     user_result = await db.execute(select(User).where(User.id == session.user_id))
@@ -214,7 +223,8 @@ async def password_reset_confirm(db: AsyncSession, token: str, new_password: str
     user = result.scalars().first()
     if not user or not user.password_reset_expires_at:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid reset token")
-    if as_utc(user.password_reset_expires_at) < datetime.now(UTC):
+    password_reset_expires_at = _require_utc(user.password_reset_expires_at, detail="Invalid reset token")
+    if password_reset_expires_at < datetime.now(UTC):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reset token expired")
 
     user.password_hash = hash_password(new_password)
@@ -236,7 +246,8 @@ async def resolve_access_token_subject(db: AsyncSession, token: str) -> User:
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token user")
 
-    if int(as_utc(user.password_changed_at).timestamp()) > int(token_iat):
+    password_changed_at = _require_utc(user.password_changed_at, detail="Invalid token user")
+    if int(password_changed_at.timestamp()) > int(token_iat):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired by password change")
 
     return user
@@ -350,7 +361,8 @@ async def approve_trusted_contact_recovery(db: AsyncSession, approval_token: str
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid recovery approval token")
     if request.mode != RecoveryMode.TRUSTED_CONTACT:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid recovery mode")
-    if as_utc(request.expires_at) < datetime.now(UTC):
+    request_expires_at = _require_utc(request.expires_at, detail="Invalid recovery approval token")
+    if request_expires_at < datetime.now(UTC):
         request.status = RecoveryRequestStatus.EXPIRED
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Recovery request expired")
     if request.completed_at is not None:
@@ -366,7 +378,8 @@ async def complete_account_recovery(db: AsyncSession, recovery_token: str, new_p
     request = result.scalars().first()
     if not request:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid recovery token")
-    if as_utc(request.expires_at) < datetime.now(UTC):
+    request_expires_at = _require_utc(request.expires_at, detail="Invalid recovery token")
+    if request_expires_at < datetime.now(UTC):
         request.status = RecoveryRequestStatus.EXPIRED
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Recovery token expired")
     if request.completed_at is not None:

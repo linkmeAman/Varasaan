@@ -5,7 +5,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 
-from dateutil.relativedelta import relativedelta
+from dateutil.relativedelta import relativedelta  # type: ignore[import-untyped]
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession

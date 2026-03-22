@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
+from typing import Any, cast
 
-import yaml
-from fastapi import FastAPI, HTTPException, Request, status
+import yaml  # type: ignore[import-untyped]
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
@@ -15,11 +17,15 @@ from app.core.config import get_settings
 from app.core.logging import configure_logging
 
 configure_logging()
-settings = get_settings()
 
-if settings.sentry_dsn:
+
+def _init_sentry() -> None:
+    settings = get_settings()
+    if not settings.sentry_dsn:
+        return
+
     try:  # pragma: no cover
-        import sentry_sdk
+        import sentry_sdk  # type: ignore[import-not-found]
 
         sentry_sdk.init(
             dsn=settings.sentry_dsn,
@@ -30,43 +36,24 @@ if settings.sentry_dsn:
     except Exception as exc:  # pragma: no cover
         logging.getLogger(__name__).warning("Sentry initialization skipped: %s", exc)
 
-app = FastAPI(
-    title=settings.app_name,
-    version="0.2.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
-)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[origin.strip() for origin in settings.cors_allow_origins.split(",") if origin.strip()],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    settings = get_settings()
+    if settings.auto_create_schema:
+        from app.db.base import Base
+        from app.db.session import get_engine
 
-app.include_router(api_router, prefix=settings.api_prefix)
-
-
-@app.on_event("startup")
-async def maybe_bootstrap_schema() -> None:
-    if not settings.auto_create_schema:
-        return
-
-    from app.db.base import Base
-    from app.db.session import get_engine
-
-    engine = get_engine()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        engine = get_engine()
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    yield
 
 
 def _error(code: str, message: str, details: list[dict] | None = None) -> dict:
     return {"error": {"code": code, "message": message, "details": details}}
 
 
-@app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     _ = request
     detail = exc.detail if isinstance(exc.detail, str) else "Request failed"
@@ -76,11 +63,10 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     )
 
 
-@app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     _ = request
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=422,
         content=_error(
             code="validation_error",
             message="Validation failed",
@@ -89,12 +75,12 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-@app.get("/healthz", tags=["health"])
 async def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
-def _load_contract_openapi() -> dict | None:
+def _load_contract_openapi() -> dict[str, Any] | None:
+    settings = get_settings()
     contract_path = Path(settings.openapi_contract_path)
     if not contract_path.is_absolute():
         contract_path = Path(__file__).resolve().parents[4] / contract_path
@@ -107,24 +93,52 @@ def _load_contract_openapi() -> dict | None:
     return None
 
 
-_openapi_cache: dict | None = None
-
-
-def custom_openapi():
-    global _openapi_cache
-    if _openapi_cache is not None:
-        return _openapi_cache
-    contract = _load_contract_openapi()
-    if contract is not None:
-        _openapi_cache = contract
-        return _openapi_cache
-    _openapi_cache = get_openapi(
-        title=app.title,
-        version=app.version,
-        description=app.description,
-        routes=app.routes,
+def create_app() -> FastAPI:
+    settings = get_settings()
+    _init_sentry()
+    app = FastAPI(
+        title=settings.app_name,
+        version="0.2.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+        lifespan=lifespan,
     )
-    return _openapi_cache
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[origin.strip() for origin in settings.cors_allow_origins.split(",") if origin.strip()],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.include_router(api_router, prefix=settings.api_prefix)
+
+    app.exception_handler(HTTPException)(http_exception_handler)
+    app.exception_handler(RequestValidationError)(validation_exception_handler)
+    app.get("/healthz", tags=["health"])(healthz)
+
+    openapi_cache: dict[str, Any] | None = None
+
+    def custom_openapi() -> dict[str, Any]:
+        nonlocal openapi_cache
+        if openapi_cache is not None:
+            return openapi_cache
+        contract = _load_contract_openapi()
+        if contract is not None:
+            openapi_cache = contract
+            return openapi_cache
+        openapi_cache = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+        )
+        return openapi_cache
+
+    cast(Any, app).openapi = custom_openapi
+    return app
 
 
-app.openapi = custom_openapi
+app = create_app()

@@ -27,6 +27,7 @@
 - [ ] `frontend-quality`
 - [ ] `infra-validate`
 - [ ] relevant Playwright spec updated for user-visible behavior changes
+- [ ] staging or real-runner evidence attached for Phase A sign-off or launch-blocking billing, email, or alert changes
 
 ## Phase Docs
 - [ ] `PROGRESS_CHECKLIST.md` updated

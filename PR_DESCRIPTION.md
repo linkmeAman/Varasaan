@@ -1,5 +1,7 @@
 ## Backend Changelog
 
+- Reconciled the MVP closure plan around a pre-phase baseline, mandatory Phase B entitlement work, `Quick wins` before collaboration, and a freeze after launchable MVP evidence.
+- Fixed the repo-native backend pytest invocation used by local sync verification and CI so backend tests load `backend/pyproject.toml` from the repo root.
 - Rebuilt the API backend with migration-driven persistence (SQLAlchemy async + Alembic) and removed runtime schema creation.
 - Replaced mocked storage/crypto flows with AWS S3 presigned upload/download and KMS envelope-key generation.
 - Added malware scan orchestration with explicit state transitions (`PENDING -> RUNNING -> CLEAN/INFECTED/ERROR`) and document lifecycle updates.

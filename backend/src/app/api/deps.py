@@ -79,6 +79,7 @@ async def get_optional_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> User | None:
     settings = get_settings()
+    token: str | None
 
     if credentials and credentials.credentials:
         token = credentials.credentials

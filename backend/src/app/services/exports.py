@@ -97,7 +97,8 @@ async def issue_one_time_download_token(db: AsyncSession, user_id: str, export_j
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Export not ready")
     if not job.artifact_key:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Export artifact missing")
-    if job.expires_at and as_utc(job.expires_at) < datetime.now(UTC):
+    expires_at = as_utc(job.expires_at)
+    if expires_at is not None and expires_at < datetime.now(UTC):
         job.status = ExportJobStatus.EXPIRED
         raise HTTPException(status_code=status.HTTP_410_GONE, detail="Export expired")
 
@@ -120,7 +121,8 @@ async def _validate_one_time_token(db: AsyncSession, export_job_id: str, one_tim
         raise HTTPException(status_code=status.HTTP_410_GONE, detail="Download token already consumed")
     if not job.download_token_hash or not job.download_token_expires_at:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Download token not issued")
-    if as_utc(job.download_token_expires_at) < datetime.now(UTC):
+    download_token_expires_at = as_utc(job.download_token_expires_at)
+    if download_token_expires_at is None or download_token_expires_at < datetime.now(UTC):
         raise HTTPException(status_code=status.HTTP_410_GONE, detail="Download token expired")
     if hash_token(one_time_token) != job.download_token_hash:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid download token")
@@ -134,7 +136,8 @@ async def build_owner_download_url(db: AsyncSession, user_id: str, export_job_id
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Export not ready")
     if not job.artifact_key:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Export artifact missing")
-    if job.expires_at and as_utc(job.expires_at) < datetime.now(UTC):
+    expires_at = as_utc(job.expires_at)
+    if expires_at is not None and expires_at < datetime.now(UTC):
         job.status = ExportJobStatus.EXPIRED
         raise HTTPException(status_code=status.HTTP_410_GONE, detail="Export expired")
     try:

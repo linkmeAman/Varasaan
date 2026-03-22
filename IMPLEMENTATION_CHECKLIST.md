@@ -50,6 +50,7 @@ Regeneration commands:
 - Install root tooling: `npm install`
 - Install git hook: `npm run prepare`
 - Backend deps: `uv sync --project backend --extra dev`
+- Backend pytest from the repo root: `uv run --project backend pytest -c backend/pyproject.toml`
 - Frontend deps: `npm ci --prefix frontend`
 - Playwright browser: `npx --prefix frontend playwright install chromium`
 

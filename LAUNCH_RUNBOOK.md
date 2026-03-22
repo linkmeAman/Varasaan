@@ -129,8 +129,10 @@ Run these checks in staging before approving production:
 
 | Check | Owner | Evidence |
 | --- | --- | --- |
-| Razorpay checkout order creation succeeds | Backend | staged order id + webhook delivery log |
-| Razorpay webhook captured event updates payment status | Backend | payment record shows `captured` with sequence |
+| Razorpay tier checkout order creation succeeds | Backend | staged order id + selected tier + webhook delivery log |
+| Razorpay captured event updates payment status and entitlement state | Backend | payment record shows `captured` and `/api/v1/auth/me` shows the expected entitlement |
+| Razorpay refund event reverses entitlement state when required by product rules | Backend | refund log + payment record + UI or API evidence after refresh |
+| Billing history and invoice download work for a staged paid order | Backend | billing-history response + downloaded invoice artifact |
 | Postmark verification email is delivered | Backend | inbox screenshot or provider event id |
 | Postmark reset email is delivered | Backend | inbox screenshot or provider event id |
 | Postmark invite/recovery emails are delivered | Backend | inbox screenshot or provider event id |
@@ -150,7 +152,7 @@ Complete and record evidence for every critical path.
 | Trusted contact invite/accept/revoke | Frontend | Playwright run | status transitions to `active` then `revoked` |
 | Document upload -> scan -> download -> grant | Frontend | Playwright run | clean scan visible, download succeeds, grant recorded |
 | Packet/export generation | Frontend | Playwright run | jobs move to `ready`; one-time token replay denied |
-| Checkout + payment webhook | Backend | Playwright run + webhook log | checkout created and payment status updates |
+| Checkout + entitlement refresh + refund | Backend | Playwright run + webhook log + UI capture | checkout succeeds, entitlement state refreshes without manual intervention, and refund behavior matches product rules |
 
 ## Go/No-Go Checklist
 
@@ -158,7 +160,7 @@ All of the following must be true before production tag creation:
 
 - Staging deploy is green.
 - `critical-path-e2e` passed on the release commit.
-- Razorpay and Postmark staging checks were executed the same day as release approval.
+- Razorpay and Postmark staging checks, including payment, refund, entitlement refresh, and invoice validation, were executed the same day as release approval.
 - Sentry release tagging and alert routing were verified.
 - Rollback owner is assigned and on-call coverage is confirmed for the first 24 hours.
 - `python scripts/ops/post_deploy_verify.py --api-base-url <api> --web-base-url <web>` passes against the target environment.

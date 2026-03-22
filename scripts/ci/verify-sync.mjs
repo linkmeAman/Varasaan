@@ -9,6 +9,14 @@ const repoRoot = path.resolve(__dirname, "..", "..");
 
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const uvCommand = process.platform === "win32" ? "uv.exe" : "uv";
+const backendPytestArgs = [
+  "run",
+  "--project",
+  "backend",
+  "pytest",
+  "-c",
+  "backend/pyproject.toml",
+];
 
 function printUsage() {
   console.log(`Usage:
@@ -43,7 +51,7 @@ function runStep(label, command, args) {
     const child = spawn(command, args, {
       cwd: repoRoot,
       stdio: "inherit",
-      shell: false,
+      shell: process.platform === "win32",
     });
 
     child.on("error", reject);
@@ -105,19 +113,13 @@ for (let index = 2; index < process.argv.length; index += 1) {
 
 try {
   await runStep("Contract sync test", uvCommand, [
-    "run",
-    "--project",
-    "backend",
-    "pytest",
+    ...backendPytestArgs,
     "backend/tests/test_contract_sync.py",
   ]);
 
   if (backendTests.length > 0) {
     await runStep("Phase backend tests", uvCommand, [
-      "run",
-      "--project",
-      "backend",
-      "pytest",
+      ...backendPytestArgs,
       ...backendTests,
     ]);
   } else {

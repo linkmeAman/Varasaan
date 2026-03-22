@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from celery import Celery
+from celery import Celery  # type: ignore[import-untyped]
 
 from app.core.config import get_settings
 

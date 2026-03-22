@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 from app.core.config import get_settings
 
 try:
-    import boto3
+    import boto3  # type: ignore[import-untyped]
 except Exception:  # pragma: no cover
     boto3 = None
 

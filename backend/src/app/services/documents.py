@@ -324,7 +324,8 @@ async def can_decrypt_document(db: AsyncSession, user_id: str, document_id: str,
             return False
         if grant.revoked_at is not None:
             return False
-        if grant.expires_at and as_utc(grant.expires_at) < datetime.now(UTC):
+        expires_at = as_utc(grant.expires_at)
+        if expires_at is not None and expires_at < datetime.now(UTC):
             return False
         return True
 

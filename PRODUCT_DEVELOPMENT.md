@@ -43,10 +43,10 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
 ## Execution Controls (March 2026)
 
 - Completion gates are nested:
-  - `Current release complete`: Phase A sync, Phase A frontend, Phase B, and current-release staging validation are closed.
-  - `MVP complete`: current release plus `Quick wins`, Phase C, Phase D, and the first-paying-user launch checklist are closed.
-  - `Roadmap complete`: MVP plus Phase E and the post-Phase-E roadmap sequence are closed.
-  - `Project complete`: roadmap plus legal/compliance/business/ops sign-offs are closed with evidence.
+  - `Baseline green`: backend `ruff`, `mypy`, and full `pytest`; frontend `lint`, `typecheck`, `smoke`, and `build`; repo-native `contract-sync`, `backend-quality`, `frontend-quality`, `infra-validate`, and `critical-path-e2e` are green from documented command paths.
+  - `Launchable MVP`: baseline plus Phase A sign-off, Phase B, `Quick wins`, Phase C, Phase D, and the first-paying-user launch checklist are closed.
+  - `Deferred after MVP`: Phase E and the broader Phase 3 and 4 roadmap stay out of active MVP closure work.
+  - `Project complete`: MVP plus legal, compliance, business, and ops sign-offs are closed with evidence.
 - Stream policy is strict:
   - every completed stream lands on `main`
   - every successor branch starts from refreshed `main`
@@ -62,33 +62,38 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
   - do not start the next stream if the root status docs disagree with implementation
 - Non-code evidence policy:
   - launch, legal, compliance, and operational checklist items must carry owner, due date, and evidence or sign-off location before the project can be called complete
+  - if work exists without proof, it stays open
+  - if work is outside frozen MVP scope, relabel it as `deferred-after-MVP`
 
 ## Active Execution Sequence (2026)
 
-- Audit snapshot (2026-03-22): the pre-Phase-A baseline has been consolidated, the Phase A backend hardening slice is implemented and verified on `codex/phase-a-backend`, the public Phase A contract artifacts are regenerated on `main`, and the executor review-state UX is implemented locally on `main`.
+- Audit snapshot (2026-03-22): frontend `lint`, `typecheck`, `build`, and `test:smoke` pass on `main`; backend `ruff`, `mypy`, and `pytest` pass on `main`; the repo-native backend pytest command path was reconciled so local sync verification and CI load the backend pytest config from the repo root; the FastAPI startup hook has been replaced with a lifespan handler; the remaining open items are Phase A real-runner sign-off and live staging or launch evidence.
 - Completion framing (March 2026):
-  - Required for current release: Phase A sync, Phase A frontend, and Phase B checkout/staging validation.
-  - Required for MVP completion: the remaining Phase 2 collaboration/crypto slices plus the first-paying-user launch checklist.
-  - Later roadmap only: Phase E B2B foundations and the broader Phase 3/4 expansion items.
+  - Required for launchable MVP: pre-phase baseline, Phase A sign-off, Phase B, `Quick wins`, Phase C, Phase D, and the first-paying-user launch checklist.
+  - Deferred after MVP: Phase E B2B foundations and the broader Phase 3 and 4 expansion items.
 - Immediate release focus (2026-03-22):
-  - Execute the updated executor Playwright review-state coverage in a real runner/staging environment.
-  - Run the Phase B payment API sufficiency review.
-  - If the existing payment surface is sufficient, skip Phase B backend/sync changes and move directly to the checkout frontend work from current `main`.
+  - Execute the updated executor Playwright review-state coverage in a real runner or staging environment.
+  - Start Phase B from refreshed `main` with backend entitlement work, contract sync, and frontend billing UX in normal stream order.
+- Pre-phase baseline:
+  - Status: complete on `main`.
+  - Exit gate: baseline verification is green from the documented local and CI command paths.
 - Phase A - After-Loss Hardening Finish:
-  - Add death-certificate metadata stripping, a risk-based manual review state, internal review tooling, review-metadata fields on case summaries, and end-to-end hardening coverage.
-  - Exit gate: every activation resolves to `active`, `pending review`, or `rejected review` without manual DB intervention.
+  - Treat this as validation-first because the implementation is already present.
+  - Exit gate: real-runner or staging evidence exists for the updated executor review-state flow.
 - Phase B - Payment & Checkout Finish:
-  - Leave backend payment APIs unchanged unless the frontend reveals a real blocker, then ship the real checkout flow, Razorpay polling, retry states, and entitlement refresh.
-  - Exit gate: a real paid staging order unlocks the intended UI.
+  - Implement the existing `free`, `essential`, and `executor` tier model end to end across backend, sync, and frontend.
+  - Exit gate: a real staging payment and refund update entitlement state in the UI without manual intervention.
+- `Quick wins`:
+  - Land the simple-account closure section before Phase C so the MVP order stays aligned with the roadmap docs.
+  - Exit gate: the remaining `Quick wins` task-workspace gap is shipped and verified.
 - Phase C - Family Workspace:
   - Expand case collaboration with participants, assignment, comments, activity visibility, and task-status notifications.
   - Exit gate: multiple participants can collaborate on one active case with audit visibility.
 - Phase D - Crypto Inheritance Kit:
-  - Add planning-mode crypto models, activation snapshots, and executor guidance while never storing secrets.
+  - Add planning-mode crypto models, activation snapshots, and executor guidance while never storing secrets or seed material.
   - Exit gate: crypto planning snapshots cleanly into after-loss mode.
 - Phase E - B2B / Scale Foundations:
-  - Add multi-tenant partner primitives, signed webhooks, usage reporting, and admin surfaces before any mobile work starts.
-  - Exit gate: one pilot tenant operates on isolated data with signed webhook integration.
+  - Deferred after MVP freeze.
 
 ---
 
@@ -223,10 +228,12 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
 
 ### 1.6 Payment Integration
 - [ ] Razorpay integration (India-first)
+- [ ] Persist `free`, `essential`, and `executor` entitlements end to end
 - [ ] One-time purchase for Essential + Executor tiers
 - [ ] Invoice generation with GST (18%) for compliance
+- [ ] Billing history and invoice download for paid tiers
 - [ ] Subscription model architecture ready (for Year 2 B2B recurring)
-- [ ] Webhook handling: payment success → unlock features (idempotent)
+- [ ] Webhook and refund handling: idempotent and entitlement-aware
 
 ---
 
@@ -234,7 +241,7 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
 
 > Goal: Executor can manage the full closure process with task tracking, proof capture, and status updates.
 >
-> V1 status (March 2026): the single-executor, trusted-contact-backed activation flow, task workspace, task-scoped evidence upload/download, case-open notifications, executor-driven case closure with 90-day evidence retention cleanup, live printable closure reporting, and recurring-payment bleed-stopper guidance are implemented. The Phase A backend hardening slice is also implemented on `codex/phase-a-backend` with metadata stripping, review-state internals, and regression coverage. The remaining execution order is the Phase A sync slice, the Phase A frontend slice, then Phase B checkout completion, Phase C collaboration, and Phase D crypto.
+> V1 status (March 2026): the single-executor, trusted-contact-backed activation flow, task workspace, task-scoped evidence upload/download, case-open notifications, executor-driven case closure with 90-day evidence retention cleanup, live printable closure reporting, and recurring-payment bleed-stopper guidance are implemented. Phase A implementation is present, but the remaining execution order for MVP closure is: pre-phase baseline -> Phase A sign-off -> Phase B -> `Quick wins` -> Phase C -> Phase D -> launch closure -> freeze.
 
 ### 2.1 Case Activation Flow
 - [x] Executor submits death certificate (PDF upload, encrypted)

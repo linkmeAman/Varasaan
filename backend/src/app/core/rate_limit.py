@@ -3,11 +3,12 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from datetime import UTC, datetime, timedelta
 from threading import Lock
+from typing import TYPE_CHECKING, Any
 
-try:
-    from redis.asyncio import Redis
-except Exception:  # pragma: no cover
-    Redis = None
+if TYPE_CHECKING:
+    from redis.asyncio import Redis as RedisClient
+else:  # pragma: no cover
+    RedisClient = Any
 
 
 class InMemoryRateLimiter:
@@ -29,7 +30,7 @@ class InMemoryRateLimiter:
 
 
 class RedisRateLimiter:
-    def __init__(self, redis_client: Redis) -> None:
+    def __init__(self, redis_client: RedisClient) -> None:
         self.redis_client = redis_client
 
     async def allow(self, key: str, limit: int, window_seconds: int) -> bool:
