@@ -1,5 +1,105 @@
 # Launch Hardening Runbook
 
+## Local Development
+
+Use this flow when you want to run the Next.js frontend and FastAPI backend together on one machine for manual testing.
+
+### Prerequisites
+
+- Python 3.12+
+- `uv`
+- Node.js and `npm`
+
+Install the app dependencies once from the repo root:
+
+```powershell
+uv sync --project backend
+npm install --prefix frontend --ignore-scripts
+```
+
+### Start The Backend
+
+Run the backend in its own terminal from the repo root:
+
+```powershell
+Set-Location D:\Varasaan\backend
+$env:PYTHONPATH = 'src'
+$env:DATABASE_URL = 'sqlite+aiosqlite:///D:/Varasaan/backend/.tmp-local.db'
+$env:AUTO_CREATE_SCHEMA = 'true'
+$env:CELERY_TASK_ALWAYS_EAGER = 'true'
+$env:MOCK_EXTERNAL_SERVICES = 'true'
+$env:DEBUG = 'true'
+$env:FRONTEND_BASE_URL = 'http://localhost:3000'
+$env:API_BASE_URL = 'http://127.0.0.1:8000'
+$env:CORS_ALLOW_ORIGINS = 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,https://varasaan-staging.vercel.app,https://varasaan.vercel.app'
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir src --host 127.0.0.1 --port 8000
+```
+
+What this local backend setup does:
+
+- uses SQLite instead of local Postgres
+- auto-creates the schema on startup
+- runs Celery-backed flows inline
+- mocks email, storage, and malware-scan integrations
+- returns debug verification/reset/recovery tokens in the API responses
+
+Backend URLs:
+
+- API docs: `http://127.0.0.1:8000/docs`
+- Health check: `http://127.0.0.1:8000/healthz`
+
+### Seed Legal Policies On A Fresh Database
+
+The register screen expects active privacy and terms policy versions. If `GET /api/v1/legal/policies` is empty, seed them once in a second terminal:
+
+```powershell
+@(
+  @{
+    policy_type = 'privacy'
+    version = '2026.03'
+    effective_from = '2026-03-01T00:00:00Z'
+    is_active = $true
+    checksum = 'privacy-2026-03'
+  },
+  @{
+    policy_type = 'terms'
+    version = '2026.03'
+    effective_from = '2026-03-01T00:00:00Z'
+    is_active = $true
+    checksum = 'terms-2026-03'
+  }
+) | ForEach-Object {
+  Invoke-RestMethod `
+    -Uri 'http://127.0.0.1:8000/api/v1/legal/policies' `
+    -Method Post `
+    -ContentType 'application/json' `
+    -Body ($_ | ConvertTo-Json)
+}
+```
+
+### Start The Frontend
+
+Run the frontend in a second terminal:
+
+```powershell
+Set-Location D:\Varasaan\frontend
+$env:NEXT_PUBLIC_API_BASE_URL = 'http://127.0.0.1:8000'
+npm run dev -- --hostname localhost --port 3000
+```
+
+Open the app at `http://localhost:3000`.
+
+### Local Testing Notes
+
+- `http://localhost:3000` and `http://127.0.0.1:3000` are both allowed by the backend CORS settings above.
+- Signup and recovery flows surface debug tokens in the UI when `DEBUG=true`.
+- Billing can be exercised as a local UI/backend flow, but it is not connected to a live Razorpay checkout in this mode.
+- Document, packet, export, and scan flows stay local because external integrations are mocked.
+
+### Stop The Services
+
+Use `Ctrl+C` in each terminal that is running `uvicorn` or `npm run dev`.
+
 ## Release Gates
 
 Production and staging releases are blocked until these GitHub checks are green on the exact commit being shipped:
