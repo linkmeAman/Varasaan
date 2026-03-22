@@ -5,7 +5,8 @@
   "scripts": {
     "prepare": "husky",
     "lint:pr-title": "node ./scripts/ci/lint-pr-title.mjs",
-    "lint:commitmsg": "commitlint --edit"
+    "lint:commitmsg": "commitlint --edit",
+    "verify:sync": "node ./scripts/ci/verify-sync.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "19.8.0",

@@ -1,5 +1,5 @@
-import Packets from '../../../views/Packets';
+import { PacketsScreen } from './packets-screen';
 
 export default function PacketsPage() {
-  return <Packets />;
+  return <PacketsScreen />;
 }

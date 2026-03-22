@@ -1,5 +1,5 @@
-import Dashboard from '../../views/Dashboard';
+import { DashboardOverviewClient } from './dashboard-overview-client';
 
 export default function DashboardPage() {
-  return <Dashboard />;
+  return <DashboardOverviewClient />;
 }

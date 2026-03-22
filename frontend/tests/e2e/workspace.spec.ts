@@ -20,11 +20,12 @@ test('inventory, contacts, documents, packets, exports, and billing flows work e
   await loginThroughUi(page, user);
 
   await page.goto('/dashboard/inventory');
+  await page.getByRole('button', { name: /Add Account/i }).first().click();
   await page.getByLabel('Platform').fill('Gmail');
   await page.getByLabel('Category').fill('communication');
   await page.getByLabel('Username Hint').fill(user.email);
   await page.getByLabel('Importance (1-5)').fill('4');
-  await page.getByRole('button', { name: /Add Account/i }).click();
+  await page.getByRole('button', { name: /^Add Account$/ }).last().click();
   await expect(page.getByText('Account added to backend inventory.')).toBeVisible();
 
   const gmailRow = page.locator('.inventory-item').filter({ hasText: 'Gmail' }).first();
@@ -59,6 +60,8 @@ test('inventory, contacts, documents, packets, exports, and billing flows work e
   await expect(page.locator('.inventory-item').filter({ hasText: inviteContactEmail })).toContainText('active');
 
   await inviteRow.getByRole('button', { name: /Revoke/i }).click();
+  await page.getByLabel('Type contact name').fill('Invite Helper');
+  await page.getByRole('button', { name: /Revoke Contact/i }).click();
   await expect(page.getByText('Trusted contact revoked.')).toBeVisible();
   await expect(page.locator('.inventory-item').filter({ hasText: inviteContactEmail })).toContainText('revoked');
 
@@ -151,6 +154,14 @@ test('inventory, contacts, documents, packets, exports, and billing flows work e
   );
   expect(replayResponse.status()).toBe(410);
 
+  await page.goto('/dashboard/heartbeat');
+  await page.locator('#heartbeat-cadence').selectOption('quarterly');
+  await page.getByRole('button', { name: /Save cadence/i }).click();
+  await expect(page.getByText('Heartbeat schedule saved.')).toBeVisible();
+  await expect(page.getByText(/Next expected check-in/i)).toBeVisible();
+  await page.getByRole('button', { name: /Check in now/i }).click();
+  await expect(page.getByText('Heartbeat check-in recorded.')).toBeVisible();
+
   await page.goto('/dashboard/billing');
   await page.getByRole('button', { name: /Create Order/i }).click();
   await expect(page.getByText('provider: razorpay')).toBeVisible();
@@ -176,6 +187,6 @@ test('inventory, contacts, documents, packets, exports, and billing flows work e
   });
   expect(webhookResponse.ok()).toBeTruthy();
 
-  await page.getByRole('button', { name: /^Refresh$/ }).click();
+  await page.getByRole('button', { name: /Verify Status|Verifying/i }).click();
   await expect(page.getByText(/captured \(seq 1\)/)).toBeVisible();
 });

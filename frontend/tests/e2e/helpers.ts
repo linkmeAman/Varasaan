@@ -107,8 +107,8 @@ export async function registerThroughUi(page: Page, user: TestUser): Promise<str
   await page.getByLabel('Full Name').fill('E2E User');
   await page.getByLabel('Phone').fill('9999999999');
   await page.getByLabel('Jurisdiction').fill('IN');
-  await page.getByRole('textbox', { name: 'Password *', exact: true }).fill(user.password);
-  await page.getByRole('textbox', { name: 'Confirm Password *', exact: true }).fill(user.password);
+  await page.getByLabel('Password').fill(user.password);
+  await page.getByLabel('Confirm Password').fill(user.password);
   await page.getByRole('button', { name: /Create Account/i }).click();
 
   await expect(page.getByText('Signup successful')).toBeVisible();

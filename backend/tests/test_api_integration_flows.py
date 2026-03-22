@@ -203,10 +203,18 @@ async def test_inventory_crud_flow(test_context):
             "category": "communication",
             "username_hint": "inventory@example.com",
             "importance_level": 3,
+            "is_recurring_payment": True,
+            "payment_rail": "card",
+            "monthly_amount_paise": 49900,
+            "payment_reference_hint": "VISA 1234",
         },
     )
     assert create_response.status_code == 201, create_response.text
     created = create_response.json()
+    assert created["is_recurring_payment"] is True
+    assert created["payment_rail"] == "card"
+    assert created["monthly_amount_paise"] == 49900
+    assert created["payment_reference_hint"] == "VISA 1234"
 
     update_response = await client.put(
         f"/api/v1/inventory/accounts/{created['id']}",
@@ -216,16 +224,48 @@ async def test_inventory_crud_flow(test_context):
             "category": "communication",
             "username_hint": "workspace@example.com",
             "importance_level": 5,
+            "is_recurring_payment": True,
+            "payment_rail": "upi_autopay",
+            "monthly_amount_paise": 79900,
+            "payment_reference_hint": "Mandate 9988",
         },
     )
     assert update_response.status_code == 200, update_response.text
-    assert update_response.json()["importance_level"] == 5
+    updated = update_response.json()
+    assert updated["importance_level"] == 5
+    assert updated["payment_rail"] == "upi_autopay"
+    assert updated["monthly_amount_paise"] == 79900
+    assert updated["payment_reference_hint"] == "Mandate 9988"
 
     list_response = await client.get("/api/v1/inventory/accounts", headers=_auth_header(user["access_token"]))
     assert list_response.status_code == 200, list_response.text
     listed = list_response.json()
     assert len(listed) == 1
     assert listed[0]["platform"] == "Google Workspace"
+    assert listed[0]["is_recurring_payment"] is True
+    assert listed[0]["payment_rail"] == "upi_autopay"
+    assert listed[0]["monthly_amount_paise"] == 79900
+
+    clear_recurring_response = await client.put(
+        f"/api/v1/inventory/accounts/{created['id']}",
+        headers=_auth_header(user["access_token"]),
+        json={
+            "platform": "Google Workspace",
+            "category": "communication",
+            "username_hint": "workspace@example.com",
+            "importance_level": 5,
+            "is_recurring_payment": False,
+            "payment_rail": "other",
+            "monthly_amount_paise": 99900,
+            "payment_reference_hint": "Should clear",
+        },
+    )
+    assert clear_recurring_response.status_code == 200, clear_recurring_response.text
+    cleared = clear_recurring_response.json()
+    assert cleared["is_recurring_payment"] is False
+    assert cleared["payment_rail"] is None
+    assert cleared["monthly_amount_paise"] is None
+    assert cleared["payment_reference_hint"] is None
 
     delete_response = await client.delete(
         f"/api/v1/inventory/accounts/{created['id']}",
@@ -236,6 +276,41 @@ async def test_inventory_crud_flow(test_context):
     after_delete = await client.get("/api/v1/inventory/accounts", headers=_auth_header(user["access_token"]))
     assert after_delete.status_code == 200, after_delete.text
     assert after_delete.json() == []
+
+
+@pytest.mark.asyncio
+async def test_inventory_recurring_validation_rejects_missing_required_fields(test_context):
+    client = test_context["client"]
+    email = "inventory-validation@example.com"
+    user = await _signup_and_login(test_context, email=email, password="StrongPassw0rd!!123")
+
+    missing_amount = await client.post(
+        "/api/v1/inventory/accounts",
+        headers=_auth_header(user["access_token"]),
+        json={
+            "platform": "Netflix",
+            "category": "streaming",
+            "username_hint": email,
+            "importance_level": 2,
+            "is_recurring_payment": True,
+            "payment_rail": "card",
+        },
+    )
+    assert missing_amount.status_code == 422, missing_amount.text
+
+    missing_rail = await client.post(
+        "/api/v1/inventory/accounts",
+        headers=_auth_header(user["access_token"]),
+        json={
+            "platform": "Spotify",
+            "category": "streaming",
+            "username_hint": email,
+            "importance_level": 2,
+            "is_recurring_payment": True,
+            "monthly_amount_paise": 15900,
+        },
+    )
+    assert missing_rail.status_code == 422, missing_rail.text
 
 
 @pytest.mark.asyncio

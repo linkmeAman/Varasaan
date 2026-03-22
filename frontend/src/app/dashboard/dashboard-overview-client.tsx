@@ -4,18 +4,19 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FileArchive, FolderOpen, Plus, ShieldAlert, Users } from 'lucide-react';
 
-import { apiClient, type DocumentSummaryResponse, type InventoryResponse, type TrustedContactResponse } from '../lib/api-client';
-import { useAuthGuard } from '../lib/use-auth-guard';
+import { apiClient, type DocumentSummaryResponse, type HeartbeatResponse, type InventoryResponse, type TrustedContactResponse } from '../../lib/api-client';
+import { useAuth } from '../../lib/auth-context';
 
-export default function Dashboard() {
-  const { isLoading: authLoading, user } = useAuthGuard();
+export function DashboardOverviewClient() {
+  const { user } = useAuth();
   const [inventoryAccounts, setInventoryAccounts] = useState<InventoryResponse[]>([]);
   const [trustedContacts, setTrustedContacts] = useState<TrustedContactResponse[]>([]);
   const [documents, setDocuments] = useState<DocumentSummaryResponse[]>([]);
+  const [heartbeat, setHeartbeat] = useState<HeartbeatResponse | null>(null);
   const [feedback, setFeedback] = useState('');
 
   useEffect(() => {
-    if (authLoading || !user) {
+    if (!user) {
       return;
     }
 
@@ -23,10 +24,11 @@ export default function Dashboard() {
 
     const load = async () => {
       try {
-        const [inventory, contacts, docs] = await Promise.all([
+        const [inventory, contacts, docs, currentHeartbeat] = await Promise.all([
           apiClient.listInventoryAccounts(),
           apiClient.listTrustedContacts(),
           apiClient.listDocuments(),
+          apiClient.getHeartbeat(),
         ]);
         if (!mounted) {
           return;
@@ -34,6 +36,7 @@ export default function Dashboard() {
         setInventoryAccounts(inventory);
         setTrustedContacts(contacts);
         setDocuments(docs);
+        setHeartbeat(currentHeartbeat);
       } catch {
         if (!mounted) {
           return;
@@ -43,11 +46,10 @@ export default function Dashboard() {
     };
 
     void load();
-
     return () => {
       mounted = false;
     };
-  }, [authLoading, user]);
+  }, [user]);
 
   const riskyAccounts = useMemo(() => inventoryAccounts.filter((account) => account.importance_level >= 4).length, [inventoryAccounts]);
   const activeContacts = useMemo(
@@ -59,19 +61,11 @@ export default function Dashboard() {
     [documents],
   );
 
-  if (authLoading) {
-    return (
-      <div className="dashboard-container animate-fade-in">
-        <p className="inventory-empty">Loading your dashboard...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="dashboard-container animate-fade-in">
       <header className="dash-header">
         <div>
-          <h1 className="dash-title">Digital Inventory</h1>
+          <h2 className="dash-title">Digital Inventory</h2>
           <p className="dash-subtitle">Planning Mode for {user?.email}</p>
         </div>
         <Link href="/dashboard/inventory" className="dash-cta">
@@ -107,7 +101,9 @@ export default function Dashboard() {
             <Users size={24} />
           </div>
           <div className="stat-data">
-            <h3>{activeContacts} / {trustedContacts.length}</h3>
+            <h3>
+              {activeContacts} / {trustedContacts.length}
+            </h3>
             <p>Active Trusted Contacts</p>
           </div>
         </div>
@@ -117,14 +113,16 @@ export default function Dashboard() {
             <FileArchive size={24} />
           </div>
           <div className="stat-data">
-            <h3>{activeDocuments} / {documents.length}</h3>
+            <h3>
+              {activeDocuments} / {documents.length}
+            </h3>
             <p>Scanned Documents</p>
           </div>
         </div>
       </div>
 
       <section className="inventory-section">
-        <h2 className="section-title">Workspace</h2>
+        <h3 className="section-title">Workspace</h3>
         <div className="inventory-list">
           <Link href="/dashboard/inventory" className="inventory-item glass-panel">
             <div className="item-meta">
@@ -147,6 +145,23 @@ export default function Dashboard() {
               <div className="item-badge">Documents</div>
               <h4>Document Vault</h4>
               <p className="item-secondary">Upload, scan, grant, and download legal documents.</p>
+            </div>
+          </Link>
+
+          <Link href="/dashboard/heartbeat" className="inventory-item glass-panel">
+            <div className="item-meta">
+              <div className="item-badge">Heartbeat</div>
+              <h4>Check-In Schedule</h4>
+              <p className="item-secondary">
+                {heartbeat?.configured
+                  ? `Status: ${heartbeat.status}. Recovery contacts: ${heartbeat.recovery_contact_count}.`
+                  : 'Configure your monthly or quarterly check-in cadence.'}
+              </p>
+            </div>
+            <div className="item-status">
+              <span className={`status-indicator ${heartbeat?.status === 'active' ? 'success' : 'warning'}`}>
+                {heartbeat?.status || 'unconfigured'}
+              </span>
             </div>
           </Link>
 

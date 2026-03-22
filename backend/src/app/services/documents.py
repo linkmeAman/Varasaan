@@ -241,6 +241,14 @@ async def apply_scan_result_for_version(
         version.scan_failed_purge_at = datetime.now(UTC) + timedelta(days=settings.scan_failed_purge_after_days)
 
     await db.flush()
+    from app.services.case_activity import record_case_evidence_scan_result_for_document
+
+    await record_case_evidence_scan_result_for_document(
+        db,
+        document_id=document.id,
+        scan_passed=scan_passed,
+        summary=summary,
+    )
     return document
 
 
@@ -256,6 +264,19 @@ async def mark_scan_error(db: AsyncSession, *, version_id: str, error: str) -> N
     scan.last_error = error[:500]
     scan.completed_at = datetime.now(UTC)
     await db.flush()
+
+    version = await db.get(DocumentVersion, version_id)
+    if version is None:
+        return
+
+    from app.services.case_activity import record_case_evidence_scan_result_for_document
+
+    await record_case_evidence_scan_result_for_document(
+        db,
+        document_id=version.document_id,
+        scan_passed=False,
+        summary=error[:500],
+    )
 
 
 async def apply_scan_result(db: AsyncSession, user_id: str, version_id: str, scan_passed: bool) -> Document:

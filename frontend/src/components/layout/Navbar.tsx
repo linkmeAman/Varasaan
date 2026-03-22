@@ -5,15 +5,15 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Menu, ShieldCheck, X } from 'lucide-react';
 
-import { apiClient } from '../../lib/api-client';
+import { useAuth } from '../../lib/auth-context';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [hasSession, setHasSession] = useState(false);
 
   const pathname = usePathname();
   const router = useRouter();
+  const { user, logout } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -24,41 +24,19 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-
-    const checkSession = async () => {
-      try {
-        await apiClient.currentUser();
-        if (mounted) {
-          setHasSession(true);
-        }
-      } catch {
-        if (mounted) {
-          setHasSession(false);
-        }
-      }
-    };
-
-    void checkSession();
-
-    return () => {
-      mounted = false;
-    };
-  }, [pathname]);
-
   const isHome = pathname === '/';
+  const isDashboardRoute = pathname?.startsWith('/dashboard');
+  const isExecutorRoute = pathname?.startsWith('/executor');
+  const hasSession = Boolean(user);
 
   const handleLogout = async () => {
-    try {
-      await apiClient.logout({});
-    } catch {
-      // best-effort logout
-    }
-
-    setHasSession(false);
+    await logout();
     router.push('/login');
   };
+
+  if (isDashboardRoute || isExecutorRoute) {
+    return null;
+  }
 
   return (
     <nav className={`navbar ${scrolled ? 'nav-scrolled glass-panel' : 'nav-transparent'}`}>
@@ -116,7 +94,7 @@ export default function Navbar() {
           )}
         </div>
 
-        <button className="mobile-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+        <button type="button" className="mobile-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
           {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>

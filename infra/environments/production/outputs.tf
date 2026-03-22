@@ -1,6 +1,6 @@
 output "github_environment_vars" {
   description = "Map these outputs to GitHub Environment variables for production workflows."
-  value       = {
+  value = {
     PROD_ECR_REPOSITORY             = module.platform.ecr_repository_name
     PROD_ECS_CLUSTER                = module.platform.ecs_cluster_name
     PROD_ECS_SERVICE                = module.platform.ecs_service_name
@@ -19,7 +19,7 @@ output "github_environment_vars" {
 
 output "github_environment_secrets" {
   description = "Map these outputs to GitHub Environment secrets for production workflows."
-  value       = {
+  value = {
     AWS_PRODUCTION_ROLE_ARN = module.platform.github_actions_role_arn
   }
   sensitive = true

@@ -1,5 +1,5 @@
-import Inventory from '../../../views/Inventory';
+import { InventoryScreen } from './inventory-screen';
 
 export default function DashboardInventoryPage() {
-  return <Inventory />;
+  return <InventoryScreen />;
 }

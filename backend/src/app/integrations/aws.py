@@ -181,6 +181,22 @@ class AwsStorageCryptoService:
             ContentType=content_type,
         )
 
+    async def delete_object(
+        self,
+        *,
+        bucket: str,
+        object_key: str,
+    ) -> None:
+        if self._is_mock_mode():
+            self._mock_objects.pop((bucket, object_key), None)
+            return
+
+        await asyncio.to_thread(
+            self._s3_or_create().delete_object,
+            Bucket=bucket,
+            Key=object_key,
+        )
+
     def get_mock_object(self, *, bucket: str, object_key: str) -> bytes | None:
         return self._mock_objects.get((bucket, object_key))
 

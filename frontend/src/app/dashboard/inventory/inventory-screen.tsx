@@ -1,0 +1,320 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { Pencil, Plus, Save, Trash2 } from 'lucide-react';
+import { useForm, useWatch } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+
+import { Button } from '../../../components/ui/Button';
+import { Dialog } from '../../../components/ui/Dialog';
+import { Input } from '../../../components/ui/Input';
+import { type InventoryResponse, type RecurringPaymentRail } from '../../../lib/api-client';
+import { formatInrFromPaise, formatPaymentRailLabel } from '../../../lib/utils';
+import { useInventoryWorkspace } from '../../../lib/use-inventory-workspace';
+
+const MONTHLY_AMOUNT_PATTERN = /^\d+(?:\.\d{1,2})?$/;
+
+const inventorySchema = z
+  .object({
+    platform: z.string().min(1, 'Platform is required.'),
+    category: z.string().min(1, 'Category is required.'),
+    usernameHint: z.string().optional(),
+    importanceLevel: z.number().min(1).max(5),
+    isRecurringPayment: z.boolean(),
+    paymentRail: z.enum(['', 'card', 'upi_autopay', 'other']),
+    monthlyAmountInr: z.string(),
+    paymentReferenceHint: z.string().optional(),
+  })
+  .superRefine((values, context) => {
+    if (!values.isRecurringPayment) {
+      return;
+    }
+
+    if (!values.paymentRail) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['paymentRail'],
+        message: 'Payment rail is required for recurring payments.',
+      });
+    }
+
+    if (!values.monthlyAmountInr.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['monthlyAmountInr'],
+        message: 'Monthly amount is required for recurring payments.',
+      });
+      return;
+    }
+
+    if (!MONTHLY_AMOUNT_PATTERN.test(values.monthlyAmountInr.trim())) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['monthlyAmountInr'],
+        message: 'Enter a valid INR amount, for example 499 or 499.99.',
+      });
+    }
+  });
+
+type InventoryFormValues = z.infer<typeof inventorySchema>;
+
+const DEFAULT_VALUES: InventoryFormValues = {
+  platform: '',
+  category: '',
+  usernameHint: '',
+  importanceLevel: 3,
+  isRecurringPayment: false,
+  paymentRail: '',
+  monthlyAmountInr: '',
+  paymentReferenceHint: '',
+};
+
+function toMonthlyAmountInr(monthlyAmountPaise: number | null | undefined): string {
+  if (typeof monthlyAmountPaise !== 'number') {
+    return '';
+  }
+  return (monthlyAmountPaise / 100).toFixed(2);
+}
+
+export function InventoryScreen() {
+  const { accounts, isLoading, feedback, error, submittingAction, createAccount, updateAccount, deleteAccount } =
+    useInventoryWorkspace();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<InventoryResponse | null>(null);
+
+  const form = useForm<InventoryFormValues>({
+    resolver: zodResolver(inventorySchema),
+    defaultValues: DEFAULT_VALUES,
+  });
+  const watchIsRecurringPayment = useWatch({
+    control: form.control,
+    name: 'isRecurringPayment',
+  });
+
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+    setEditingAccount(null);
+    form.reset(DEFAULT_VALUES);
+  };
+
+  useEffect(() => {
+    if (editingAccount) {
+      form.reset({
+        platform: editingAccount.platform,
+        category: editingAccount.category,
+        usernameHint: editingAccount.username_hint || '',
+        importanceLevel: editingAccount.importance_level,
+        isRecurringPayment: Boolean(editingAccount.is_recurring_payment),
+        paymentRail: (editingAccount.payment_rail || '') as '' | RecurringPaymentRail,
+        monthlyAmountInr: toMonthlyAmountInr(editingAccount.monthly_amount_paise),
+        paymentReferenceHint: editingAccount.payment_reference_hint || '',
+      });
+      return;
+    }
+
+    if (isDialogOpen) {
+      form.reset(DEFAULT_VALUES);
+    }
+  }, [editingAccount, form, isDialogOpen]);
+
+  useEffect(() => {
+    if (watchIsRecurringPayment) {
+      return;
+    }
+
+    form.setValue('paymentRail', '');
+    form.setValue('monthlyAmountInr', '');
+    form.setValue('paymentReferenceHint', '');
+  }, [form, watchIsRecurringPayment]);
+
+  const handleSubmit = form.handleSubmit(async (values) => {
+    const payload = {
+      platform: values.platform,
+      category: values.category,
+      usernameHint: values.usernameHint || '',
+      importanceLevel: values.importanceLevel,
+      isRecurringPayment: values.isRecurringPayment,
+      paymentRail: values.paymentRail,
+      monthlyAmountInr: values.monthlyAmountInr,
+      paymentReferenceHint: values.paymentReferenceHint || '',
+    };
+
+    const result = editingAccount ? await updateAccount(editingAccount.id, payload) : await createAccount(payload);
+    if (result) {
+      closeDialog();
+    }
+  });
+
+  return (
+    <div className="inventory-manager animate-fade-in">
+      <div className="inventory-manager-header">
+        <div>
+          <p className="item-badge">Inventory</p>
+          <h2 className="dash-title">Inventory Accounts</h2>
+          <p className="dash-subtitle">Create, update, and remove account inventory entries.</p>
+        </div>
+        <Button
+          type="button"
+          onClick={() => {
+            setEditingAccount(null);
+            setIsDialogOpen(true);
+          }}
+        >
+          <Plus size={16} /> Add Account
+        </Button>
+      </div>
+
+      {feedback ? <p className="inventory-feedback">{feedback}</p> : null}
+      {error ? <p className="input-error-msg">{error}</p> : null}
+
+      <Dialog
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeDialog();
+            return;
+          }
+          setIsDialogOpen(true);
+        }}
+        title={editingAccount ? 'Edit inventory account' : 'Add inventory account'}
+        description="Capture the account and how critical it is for recovery planning."
+      >
+        <form className="inventory-form" onSubmit={handleSubmit}>
+          <div className="inventory-form-grid">
+            <Input label="Platform" placeholder="e.g. Gmail" error={form.formState.errors.platform?.message} {...form.register('platform')} />
+            <Input
+              label="Category"
+              placeholder="e.g. Communication"
+              error={form.formState.errors.category?.message}
+              {...form.register('category')}
+            />
+            <Input
+              label="Username Hint"
+              placeholder="you@example.com"
+              error={form.formState.errors.usernameHint?.message}
+              {...form.register('usernameHint')}
+            />
+            <Input
+              label="Importance (1-5)"
+              type="number"
+              min={1}
+              max={5}
+              error={form.formState.errors.importanceLevel?.message}
+              {...form.register('importanceLevel', { valueAsNumber: true })}
+            />
+          </div>
+
+          <div className="inventory-recurring-toggle">
+            <label className="inventory-checkbox">
+              <input type="checkbox" {...form.register('isRecurringPayment')} />
+              <span>Recurring payment</span>
+            </label>
+            <p className="input-helper-msg">Flag subscriptions, mandates, or recurring debits that should be cancelled after activation.</p>
+          </div>
+
+          {watchIsRecurringPayment ? (
+            <div className="inventory-form-grid inventory-form-grid--recurring">
+              <div className="input-wrapper">
+                <label className="input-label" htmlFor="inventory-payment-rail">
+                  Payment Rail <span className="input-required">*</span>
+                </label>
+                <select id="inventory-payment-rail" className="input-field" {...form.register('paymentRail')}>
+                  <option value="">Select a payment rail</option>
+                  <option value="card">Card</option>
+                  <option value="upi_autopay">UPI Autopay</option>
+                  <option value="other">Other</option>
+                </select>
+                {form.formState.errors.paymentRail?.message ? (
+                  <p className="input-error-msg">{form.formState.errors.paymentRail.message}</p>
+                ) : null}
+              </div>
+
+              <Input
+                label="Monthly Amount (INR)"
+                placeholder="499.00"
+                inputMode="decimal"
+                error={form.formState.errors.monthlyAmountInr?.message}
+                helperText="Stored as paise for activation snapshots."
+                {...form.register('monthlyAmountInr')}
+              />
+
+              <Input
+                label="Payment Reference Hint"
+                placeholder="e.g. VISA 1234 or Mandate ID"
+                error={form.formState.errors.paymentReferenceHint?.message}
+                {...form.register('paymentReferenceHint')}
+              />
+            </div>
+          ) : null}
+
+          <div className="inventory-actions-row">
+            <Button type="submit" isLoading={Boolean(submittingAction)}>
+              {editingAccount ? <Save size={16} /> : <Plus size={16} />}
+              {editingAccount ? 'Update Account' : 'Add Account'}
+            </Button>
+            <Button type="button" variant="ghost" onClick={closeDialog}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      <section className="inventory-panel glass-panel">
+        <h3 className="section-title">Saved Accounts</h3>
+        {isLoading ? (
+          <p className="inventory-empty">Loading accounts...</p>
+        ) : accounts.length === 0 ? (
+          <p className="inventory-empty">No accounts yet. Add your first account above.</p>
+        ) : (
+          <div className="inventory-list">
+            {accounts.map((account) => (
+              <div key={account.id} className="inventory-item glass-panel">
+                <div className="item-meta">
+                  <div className="item-badge">{account.category}</div>
+                  <h4>{account.platform}</h4>
+                  <p className="item-secondary">{account.username_hint || 'No username hint provided'}</p>
+                  {account.is_recurring_payment ? (
+                    <div className="inventory-recurring-meta">
+                      <span className="status-indicator warning">Recurring</span>
+                      <span className="status-indicator success">{formatPaymentRailLabel(account.payment_rail)}</span>
+                      <span className="item-secondary">{formatInrFromPaise(account.monthly_amount_paise)} / month</span>
+                      {account.payment_reference_hint ? <p className="item-secondary">Reference: {account.payment_reference_hint}</p> : null}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="item-status">
+                  <span className={`status-indicator ${account.importance_level >= 4 ? 'warning' : 'success'}`}>
+                    Priority {account.importance_level}
+                  </span>
+                </div>
+                <div className="inventory-item-actions">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setEditingAccount(account);
+                      setIsDialogOpen(true);
+                    }}
+                  >
+                    <Pencil size={14} /> Edit
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => void deleteAccount(account.id)}
+                    isLoading={submittingAction === `delete-${account.id}`}
+                  >
+                    <Trash2 size={14} /> Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
