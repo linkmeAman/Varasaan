@@ -28,6 +28,32 @@ Every remaining phase is executed in three standing streams:
 - Sync stream owns `PROGRESS_CHECKLIST.md`, `PRODUCT_DEVELOPMENT.md`, `CHANGELOG.md`, and `INTEGRATION_CHECKLIST.md`.
 - A phase is not complete until implementation, generated artifacts, verification, and docs land together.
 
+## Execution Controls (2026)
+
+- Completion gates are nested:
+  - `Current release complete`: Phase A sync, Phase A frontend, Phase B, and current-release staging validation are closed.
+  - `MVP complete`: current release plus `Quick wins`, Phase C, Phase D, and the first-paying-user launch checklist are closed.
+  - `Roadmap complete`: MVP plus Phase E and the post-Phase-E roadmap sequence are closed.
+  - `Project complete`: roadmap plus legal, compliance, business, and ongoing ops sign-offs are closed with evidence.
+- Merge policy is strict:
+  - every completed stream lands on `main`
+  - every successor stream branch is created or reset from the new `main` tip
+  - stale successor branches are not continued
+- Precondition before a stream starts:
+  - reconcile dirty planning docs on `main`
+  - confirm `main` already contains the predecessor stream result
+  - confirm the stream scope matches the documented phase scope
+- Stop conditions are explicit:
+  - do not start the next stream if contract changes are unmerged
+  - do not start the next stream if generated artifacts are stale
+  - do not start the next stream if required tests are failing
+  - do not start the next stream if the four root status docs contradict implementation
+- Evidence policy is explicit:
+  - high-level done/not-done state stays in `PROGRESS_CHECKLIST.md`
+  - contract state lives in `INTEGRATION_CHECKLIST.md`
+  - release-facing notes live in `CHANGELOG.md`
+  - non-code launch, legal, compliance, and ops items must carry owner, due date, and evidence/sign-off location in `PRODUCT_DEVELOPMENT.md`
+
 ## Phase Sequence
 
 ### Phase A - After-Loss Hardening Finish
@@ -46,14 +72,14 @@ Sync / QA / Docs:
 - Regenerate `packages/shared/openapi/openapi.generated.json`, `frontend/src/lib/generated/api-client.ts`, and `frontend/src/api/openapi-types.ts`.
 - Update status docs to mark hardening complete.
 - Run contract sync plus backend regression coverage.
-- Status (2026-03-22): next active stream.
+- Status (2026-03-22): implemented locally on `main`; backend regression coverage passed and public contract artifacts are regenerated.
 - Commit: `chore(contract): sync activation review schema and docs`
 
 Frontend:
 - Add executor states for `pending review` and `rejected review`.
 - Show the review reason/note and the replacement-upload path.
 - Keep active and closed flows unchanged.
-- Status (2026-03-22): blocked until the sync commit lands.
+- Status (2026-03-22): implemented locally on `main`; updated executor Playwright coverage is written, but a real runner/staging execution is still pending.
 - Commit: `feat(web): surface activation review states`
 
 Exit gate:
@@ -145,6 +171,21 @@ Frontend:
 Exit gate:
 - One pilot tenant can operate on isolated data with signed webhook integration.
 
+## Completion Buckets (2026)
+
+Required for current release:
+- Execute the updated Phase A executor Playwright coverage in a real runner/staging environment and resolve any review-state regressions.
+- Finish Phase B checkout so a real staged payment can unlock the intended UI.
+
+Required for MVP completion:
+- Finish the remaining open task-workspace item (`Quick wins`) if it remains in MVP scope.
+- Finish Phase C collaboration.
+- Finish Phase D crypto guidance and planning.
+- Finish the first-paying-user launch checklist from `PRODUCT_DEVELOPMENT.md`.
+
+Later roadmap only:
+- Phase E multi-tenant partner foundations and everything after it in the broader product roadmap.
+
 ## Sync / QA / Docs Responsibilities In Every Phase
 
 - Pull the backend branch after API/schema changes.
@@ -162,14 +203,14 @@ Exit gate:
 - The repo previously had no explicit sync-owner process; this plan formalizes that stream.
 - The repo previously had no root-level local sync verification entrypoint; `npm run verify:sync` now covers the shared contract/type/lint/typecheck path and accepts phase-specific backend test targets.
 - The PR checklist previously did not require the four phase docs to be updated alongside implementation.
-- Phase A manual-review tooling is implemented on `codex/phase-a-backend`, but the synced public contract/client artifacts and executor UX still need to land.
+- Phase A public contract artifacts and executor review-state UX are now implemented locally on `main`, but the updated Playwright review-state coverage still needs a real runner/staging execution for sign-off.
 - Payment frontend is still unfinished even though the backend surface exists.
 - Playwright and Vitest results from this sandbox are not a substitute for a real runner or staging pass.
-- The pre-Phase-A mixed tree has been consolidated into `codex/pre-phase-a-baseline`; the next branch step is Phase A sync, then Phase A frontend.
+- The pre-Phase-A mixed tree has been consolidated into `codex/pre-phase-a-baseline`; any remaining successor work must branch from current `main`, not the stale pre-sync Phase A heads.
 
 ## Assumptions
 
-- One backend engineer, one frontend engineer, and one sync/QA/docs engineer work each phase.
+- One engineer can execute the standing streams sequentially.
 - Backend is the source of truth for contract shape.
 - Sync stream owns generated artifacts and docs, not backend or frontend.
 - No phase is marked complete until implementation, generated artifacts, verification, and docs all land together.

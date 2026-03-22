@@ -6,8 +6,13 @@ import { ArrowRight, FileUp, FolderKanban, ShieldAlert } from 'lucide-react';
 
 import { Button } from '../../components/ui/Button';
 import {
+  canExecutorUploadDeathCertificate,
+  formatExecutorDate,
+  formatExecutorReviewReason,
+  getExecutorActivationDescription,
   getExecutorCaseLabel,
-  getExecutorStatusLabel,
+  getExecutorCaseStatusLabel,
+  getExecutorCaseStatusTone,
   useExecutorCases,
 } from '../../lib/use-executor-cases';
 
@@ -96,7 +101,7 @@ export function ExecutorLandingScreen() {
                 }}
               >
                 <div className="executor-case-card-header">
-                  <span className={`status-indicator executor-status-${caseSummary.status}`}>{getExecutorStatusLabel(caseSummary.status)}</span>
+                  <span className={`status-indicator ${getExecutorCaseStatusTone(caseSummary)}`}>{getExecutorCaseStatusLabel(caseSummary)}</span>
                   <span className="item-badge">{caseSummary.task_count} tasks</span>
                 </div>
                 <h3>{getExecutorCaseLabel(caseSummary)}</h3>
@@ -116,9 +121,9 @@ export function ExecutorLandingScreen() {
           <section className="inventory-panel glass-panel executor-section">
             <div className="executor-section-header">
               <div>
-                <p className="item-badge">Activation</p>
+                <p className="item-badge">{getExecutorCaseStatusLabel(selectedCase)}</p>
                 <h2 className="section-title">Activate {getExecutorCaseLabel(selectedCase)}</h2>
-                <p className="dash-subtitle">Upload a PDF death certificate to unlock the executor workspace for this case.</p>
+                <p className="dash-subtitle">{getExecutorActivationDescription(selectedCase)}</p>
               </div>
             </div>
 
@@ -126,40 +131,77 @@ export function ExecutorLandingScreen() {
               <div className="executor-activation-copy">
                 <div className="heartbeat-warning">
                   <ShieldAlert size={18} />
-                  <p>Activation requires a single PDF under 10MB. The upload is stored under the deceased owner&apos;s secure document record.</p>
+                  <p>
+                    {selectedCase.activation_review_status === 'pending_review'
+                      ? 'Manual review is in progress. Wait for approval or rejection before attempting another upload.'
+                      : 'Activation requires a single PDF under 10MB. The upload is stored under the deceased owner&apos;s secure document record.'}
+                  </p>
                 </div>
                 <div className="executor-activation-meta">
                   <span>Owner</span>
                   <strong>{selectedCase.owner_email}</strong>
                 </div>
+                {selectedCase.activation_review_status !== 'not_requested' ? (
+                  <div className="executor-task-readonly">
+                    <div>
+                      <span>Review status</span>
+                      <strong>{getExecutorCaseStatusLabel(selectedCase)}</strong>
+                    </div>
+                    <div>
+                      <span>Reason</span>
+                      <strong>{formatExecutorReviewReason(selectedCase.activation_review_reason)}</strong>
+                    </div>
+                    <div>
+                      <span>Requested</span>
+                      <strong>{formatExecutorDate(selectedCase.activation_review_requested_at)}</strong>
+                    </div>
+                    <div>
+                      <span>Updated</span>
+                      <strong>{formatExecutorDate(selectedCase.activation_review_updated_at)}</strong>
+                    </div>
+                    <div>
+                      <span>Review note</span>
+                      <strong>{selectedCase.activation_review_note || 'Not provided'}</strong>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <div className="inventory-form">
-                <div className="input-wrapper">
-                  <label className="input-label" htmlFor="death-certificate-file">
-                    Death Certificate PDF <span className="input-required">*</span>
-                  </label>
-                  <input
-                    id="death-certificate-file"
-                    className="input-field"
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    onChange={handleFileChange}
-                  />
-                </div>
-
-                {loadingAction === `activate-${selectedCase.id}` ? (
-                  <div className="upload-progress">
-                    <div className="upload-progress-bar">
-                      <span style={{ width: `${uploadProgress}%` }} />
+                {canExecutorUploadDeathCertificate(selectedCase) ? (
+                  <>
+                    <div className="input-wrapper">
+                      <label className="input-label" htmlFor="death-certificate-file">
+                        {selectedCase.activation_review_status === 'rejected' ? 'Replacement Certificate PDF' : 'Death Certificate PDF'}{' '}
+                        <span className="input-required">*</span>
+                      </label>
+                      <input
+                        id="death-certificate-file"
+                        className="input-field"
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        onChange={handleFileChange}
+                      />
                     </div>
-                    <p className="input-helper-msg">Uploading {uploadProgress}%</p>
-                  </div>
-                ) : null}
 
-                <Button type="button" onClick={() => void handleActivate()} isLoading={loadingAction === `activate-${selectedCase.id}`}>
-                  <FileUp size={16} /> Upload and Activate
-                </Button>
+                    {loadingAction === `activate-${selectedCase.id}` ? (
+                      <div className="upload-progress">
+                        <div className="upload-progress-bar">
+                          <span style={{ width: `${uploadProgress}%` }} />
+                        </div>
+                        <p className="input-helper-msg">Uploading {uploadProgress}%</p>
+                      </div>
+                    ) : null}
+
+                    <Button type="button" onClick={() => void handleActivate()} isLoading={loadingAction === `activate-${selectedCase.id}`}>
+                      <FileUp size={16} /> {selectedCase.activation_review_status === 'rejected' ? 'Upload Replacement Certificate' : 'Upload and Activate'}
+                    </Button>
+                  </>
+                ) : (
+                  <p className="inventory-empty">
+                    Manual review is still pending. Replacement upload becomes available here if the review is rejected.
+                  </p>
+                )}
               </div>
             </div>
           </section>
