@@ -2,22 +2,60 @@
 
 import { useEffect, useState } from 'react';
 import { Pencil, Plus, Save, Trash2 } from 'lucide-react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { Button } from '../../../components/ui/Button';
 import { Dialog } from '../../../components/ui/Dialog';
 import { Input } from '../../../components/ui/Input';
-import { type InventoryResponse } from '../../../lib/api-client';
+import { type InventoryResponse, type RecurringPaymentRail } from '../../../lib/api-client';
+import { formatInrFromPaise, formatPaymentRailLabel } from '../../../lib/utils';
 import { useInventoryWorkspace } from '../../../lib/use-inventory-workspace';
 
-const inventorySchema = z.object({
-  platform: z.string().min(1, 'Platform is required.'),
-  category: z.string().min(1, 'Category is required.'),
-  usernameHint: z.string().optional(),
-  importanceLevel: z.number().min(1).max(5),
-});
+const MONTHLY_AMOUNT_PATTERN = /^\d+(?:\.\d{1,2})?$/;
+
+const inventorySchema = z
+  .object({
+    platform: z.string().min(1, 'Platform is required.'),
+    category: z.string().min(1, 'Category is required.'),
+    usernameHint: z.string().optional(),
+    importanceLevel: z.number().min(1).max(5),
+    isRecurringPayment: z.boolean(),
+    paymentRail: z.enum(['', 'card', 'upi_autopay', 'other']),
+    monthlyAmountInr: z.string(),
+    paymentReferenceHint: z.string().optional(),
+  })
+  .superRefine((values, context) => {
+    if (!values.isRecurringPayment) {
+      return;
+    }
+
+    if (!values.paymentRail) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['paymentRail'],
+        message: 'Payment rail is required for recurring payments.',
+      });
+    }
+
+    if (!values.monthlyAmountInr.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['monthlyAmountInr'],
+        message: 'Monthly amount is required for recurring payments.',
+      });
+      return;
+    }
+
+    if (!MONTHLY_AMOUNT_PATTERN.test(values.monthlyAmountInr.trim())) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['monthlyAmountInr'],
+        message: 'Enter a valid INR amount, for example 499 or 499.99.',
+      });
+    }
+  });
 
 type InventoryFormValues = z.infer<typeof inventorySchema>;
 
@@ -26,7 +64,18 @@ const DEFAULT_VALUES: InventoryFormValues = {
   category: '',
   usernameHint: '',
   importanceLevel: 3,
+  isRecurringPayment: false,
+  paymentRail: '',
+  monthlyAmountInr: '',
+  paymentReferenceHint: '',
 };
+
+function toMonthlyAmountInr(monthlyAmountPaise: number | null | undefined): string {
+  if (typeof monthlyAmountPaise !== 'number') {
+    return '';
+  }
+  return (monthlyAmountPaise / 100).toFixed(2);
+}
 
 export function InventoryScreen() {
   const { accounts, isLoading, feedback, error, submittingAction, createAccount, updateAccount, deleteAccount } =
@@ -37,6 +86,10 @@ export function InventoryScreen() {
   const form = useForm<InventoryFormValues>({
     resolver: zodResolver(inventorySchema),
     defaultValues: DEFAULT_VALUES,
+  });
+  const watchIsRecurringPayment = useWatch({
+    control: form.control,
+    name: 'isRecurringPayment',
   });
 
   const closeDialog = () => {
@@ -52,6 +105,10 @@ export function InventoryScreen() {
         category: editingAccount.category,
         usernameHint: editingAccount.username_hint || '',
         importanceLevel: editingAccount.importance_level,
+        isRecurringPayment: Boolean(editingAccount.is_recurring_payment),
+        paymentRail: (editingAccount.payment_rail || '') as '' | RecurringPaymentRail,
+        monthlyAmountInr: toMonthlyAmountInr(editingAccount.monthly_amount_paise),
+        paymentReferenceHint: editingAccount.payment_reference_hint || '',
       });
       return;
     }
@@ -61,12 +118,26 @@ export function InventoryScreen() {
     }
   }, [editingAccount, form, isDialogOpen]);
 
+  useEffect(() => {
+    if (watchIsRecurringPayment) {
+      return;
+    }
+
+    form.setValue('paymentRail', '');
+    form.setValue('monthlyAmountInr', '');
+    form.setValue('paymentReferenceHint', '');
+  }, [form, watchIsRecurringPayment]);
+
   const handleSubmit = form.handleSubmit(async (values) => {
     const payload = {
       platform: values.platform,
       category: values.category,
       usernameHint: values.usernameHint || '',
       importanceLevel: values.importanceLevel,
+      isRecurringPayment: values.isRecurringPayment,
+      paymentRail: values.paymentRail,
+      monthlyAmountInr: values.monthlyAmountInr,
+      paymentReferenceHint: values.paymentReferenceHint || '',
     };
 
     const result = editingAccount ? await updateAccount(editingAccount.id, payload) : await createAccount(payload);
@@ -134,6 +205,49 @@ export function InventoryScreen() {
             />
           </div>
 
+          <div className="inventory-recurring-toggle">
+            <label className="inventory-checkbox">
+              <input type="checkbox" {...form.register('isRecurringPayment')} />
+              <span>Recurring payment</span>
+            </label>
+            <p className="input-helper-msg">Flag subscriptions, mandates, or recurring debits that should be cancelled after activation.</p>
+          </div>
+
+          {watchIsRecurringPayment ? (
+            <div className="inventory-form-grid inventory-form-grid--recurring">
+              <div className="input-wrapper">
+                <label className="input-label" htmlFor="inventory-payment-rail">
+                  Payment Rail <span className="input-required">*</span>
+                </label>
+                <select id="inventory-payment-rail" className="input-field" {...form.register('paymentRail')}>
+                  <option value="">Select a payment rail</option>
+                  <option value="card">Card</option>
+                  <option value="upi_autopay">UPI Autopay</option>
+                  <option value="other">Other</option>
+                </select>
+                {form.formState.errors.paymentRail?.message ? (
+                  <p className="input-error-msg">{form.formState.errors.paymentRail.message}</p>
+                ) : null}
+              </div>
+
+              <Input
+                label="Monthly Amount (INR)"
+                placeholder="499.00"
+                inputMode="decimal"
+                error={form.formState.errors.monthlyAmountInr?.message}
+                helperText="Stored as paise for activation snapshots."
+                {...form.register('monthlyAmountInr')}
+              />
+
+              <Input
+                label="Payment Reference Hint"
+                placeholder="e.g. VISA 1234 or Mandate ID"
+                error={form.formState.errors.paymentReferenceHint?.message}
+                {...form.register('paymentReferenceHint')}
+              />
+            </div>
+          ) : null}
+
           <div className="inventory-actions-row">
             <Button type="submit" isLoading={Boolean(submittingAction)}>
               {editingAccount ? <Save size={16} /> : <Plus size={16} />}
@@ -160,6 +274,14 @@ export function InventoryScreen() {
                   <div className="item-badge">{account.category}</div>
                   <h4>{account.platform}</h4>
                   <p className="item-secondary">{account.username_hint || 'No username hint provided'}</p>
+                  {account.is_recurring_payment ? (
+                    <div className="inventory-recurring-meta">
+                      <span className="status-indicator warning">Recurring</span>
+                      <span className="status-indicator success">{formatPaymentRailLabel(account.payment_rail)}</span>
+                      <span className="item-secondary">{formatInrFromPaise(account.monthly_amount_paise)} / month</span>
+                      {account.payment_reference_hint ? <p className="item-secondary">Reference: {account.payment_reference_hint}</p> : null}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="item-status">
                   <span className={`status-indicator ${account.importance_level >= 4 ? 'warning' : 'success'}`}>

@@ -24,12 +24,17 @@ def create_celery() -> Celery:
             "app.workers.tasks.process_export_job_task": {"queue": "varasaan.exports"},
             "app.workers.tasks.process_packet_job_task": {"queue": "varasaan.packets"},
             "app.workers.tasks.process_malware_scan_task": {"queue": "varasaan.scans"},
+            "app.workers.tasks.purge_expired_case_evidence_task": {"queue": "varasaan.retention"},
         },
         beat_schedule={
             "dispatch-due-heartbeats-every-5-minutes": {
                 "task": "app.workers.heartbeat_tasks.dispatch_due_heartbeats_task",
                 "schedule": 300.0,
-            }
+            },
+            "purge-expired-case-evidence-daily": {
+                "task": "app.workers.tasks.purge_expired_case_evidence_task",
+                "schedule": 86400.0,
+            },
         },
         task_always_eager=settings.celery_task_always_eager,
         task_ignore_result=settings.celery_task_always_eager,

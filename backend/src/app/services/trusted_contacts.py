@@ -34,6 +34,12 @@ async def create_trusted_contact(db: AsyncSession, user_id: str, payload: Truste
     )
     db.add(contact)
     await db.flush()
+
+    if contact.role.value == "executor":
+        from app.services.cases import upsert_case_for_executor_contact
+
+        await upsert_case_for_executor_contact(db, owner_user_id=user_id, trusted_contact=contact)
+
     return contact
 
 

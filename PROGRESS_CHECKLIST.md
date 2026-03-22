@@ -4,7 +4,10 @@ This checklist tracks repository reality against the current product roadmap and
 
 Sync sources: status below is derived from the current frontend routes, backend API surface, generated client artifacts, Playwright coverage, and CI workflows.
 
----
+- [x] Foundation: monorepo structure, CI/CD, async backend, cookie-auth security baseline, and OpenAPI contract sync are in place.
+- [x] Planning mode baseline: auth, inventory, trusted contacts, document uploads, evidence packet/export jobs, heartbeat flows, and the backend Razorpay surface are implemented.
+- [x] After-loss baseline: executor designation, pending/active cases, activation upload flow, task workspace, evidence capture, live closure reporting, case-open notifications, case closure, retention cleanup, and bleed-stopper guidance are implemented.
+- [ ] Planning mode finish: the real checkout UI and staging payment validation are still open.
 
 ## Phase 0 - Foundation
 
@@ -15,7 +18,7 @@ Infrastructure, release governance, contract generation, and the base backend st
 - [x] Database schema baseline: core entities, Alembic, and async SQLAlchemy wiring exist.
 - [x] Security baseline: cookie auth, CSRF enforcement, OpenAPI sync, and protected API dependencies exist.
 
----
+## Active Phase Queue
 
 ## Phase 1 - MVP Planning Mode
 
@@ -55,7 +58,9 @@ The MVP is partially shipped. The remaining work is now architecture hardening p
 - [ ] Upgrade inventory, document upload, and billing flows from MVP behavior to hardened UX patterns.
 - [ ] Re-run local frontend/backend verification after dependency bootstrap so current status is backed by fresh execution, not only checked-in code.
 
----
+Exit gate:
+- [ ] Every activation ends in exactly one of `active`, `pending review`, or `rejected review`.
+- [ ] No manual DB intervention is required.
 
 ## Phase 2 - After-Loss Mode
 
@@ -68,7 +73,12 @@ This phase remains pending and should not be started until Phase 1 architecture 
 - [ ] Family workspace
 - [ ] Crypto inheritance kit
 
----
+Checklist:
+- [ ] Build the real checkout flow for paid tiers.
+- [ ] Add Razorpay status polling plus success, failure, and retry states.
+- [ ] Refresh entitlements after payment success.
+- [ ] Sync contract/client artifacts only if payment payloads change.
+- [ ] Complete staging validation with a real paid order.
 
 ## Phase 3 and 4 - Future Roadmap
 
@@ -77,7 +87,7 @@ This phase remains pending and should not be started until Phase 1 architecture 
 - [ ] Analytics and observability expansion
 - [ ] AI-assisted letter drafting and regional language support
 
----
+### Phase C - Family Workspace
 
 ## Immediate Next Steps
 

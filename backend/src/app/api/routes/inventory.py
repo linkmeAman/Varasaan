@@ -12,6 +12,26 @@ from app.schemas.inventory import InventoryCreateRequest, InventoryResponse, Inv
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
 
+def _normalize_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _apply_recurring_payment_fields(account: InventoryAccount, payload: InventoryCreateRequest | InventoryUpdateRequest) -> None:
+    account.is_recurring_payment = payload.is_recurring_payment
+    if payload.is_recurring_payment:
+        account.payment_rail = payload.payment_rail
+        account.monthly_amount_paise = payload.monthly_amount_paise
+        account.payment_reference_hint = _normalize_optional_text(payload.payment_reference_hint)
+        return
+
+    account.payment_rail = None
+    account.monthly_amount_paise = None
+    account.payment_reference_hint = None
+
+
 def _to_inventory_response(account: InventoryAccount) -> InventoryResponse:
     return InventoryResponse(
         id=account.id,
@@ -19,6 +39,10 @@ def _to_inventory_response(account: InventoryAccount) -> InventoryResponse:
         category=account.category,
         username_hint=account.username_hint,
         importance_level=account.importance_level,
+        is_recurring_payment=account.is_recurring_payment,
+        payment_rail=account.payment_rail,
+        monthly_amount_paise=account.monthly_amount_paise,
+        payment_reference_hint=account.payment_reference_hint,
     )
 
 
@@ -35,6 +59,7 @@ async def create_inventory_account(
         username_hint=payload.username_hint,
         importance_level=payload.importance_level,
     )
+    _apply_recurring_payment_fields(account, payload)
     db.add(account)
     await db.flush()
     return _to_inventory_response(account)
@@ -69,6 +94,7 @@ async def update_inventory_account(
     account.category = payload.category
     account.username_hint = payload.username_hint
     account.importance_level = payload.importance_level
+    _apply_recurring_payment_fields(account, payload)
     await db.flush()
     return _to_inventory_response(account)
 

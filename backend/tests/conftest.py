@@ -37,10 +37,33 @@ class FakeAwsService:
         _ = content_type
         self.uploaded[(bucket, object_key)] = payload
 
+    async def delete_object(self, *, bucket: str, object_key: str) -> None:
+        self.uploaded.pop((bucket, object_key), None)
+
 
 class FakeMalwareClient:
+    def __init__(self) -> None:
+        self._queued_outcomes: list[object] = []
+
+    def queue_result(self, *, scan_passed: bool, summary: str, provider_scan_id: str = "scan_test_queued") -> None:
+        self._queued_outcomes.append(
+            SimpleNamespace(
+                scan_passed=scan_passed,
+                summary=summary,
+                provider_scan_id=provider_scan_id,
+            )
+        )
+
+    def queue_error(self, error: Exception) -> None:
+        self._queued_outcomes.append(error)
+
     async def scan_object(self, *, object_url: str, object_key: str, version_id: str):
         _ = (object_url, object_key, version_id)
+        if self._queued_outcomes:
+            outcome = self._queued_outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
         return SimpleNamespace(scan_passed=True, summary="clean", provider_scan_id="scan_test_1")
 
 
@@ -90,6 +113,7 @@ async def test_context(monkeypatch: pytest.MonkeyPatch):
     fake_malware = FakeMalwareClient()
     monkeypatch.setattr("app.api.deps.get_redis_client", lambda: None)
     monkeypatch.setattr("app.services.documents.get_aws_storage_crypto_service", lambda: fake_aws)
+    monkeypatch.setattr("app.services.cases.get_aws_storage_crypto_service", lambda: fake_aws)
     monkeypatch.setattr("app.services.exports.get_aws_storage_crypto_service", lambda: fake_aws)
     monkeypatch.setattr("app.services.packets.get_aws_storage_crypto_service", lambda: fake_aws)
     monkeypatch.setattr("app.services.documents.get_malware_scan_client", lambda: fake_malware)
@@ -100,6 +124,7 @@ async def test_context(monkeypatch: pytest.MonkeyPatch):
             "client": client,
             "session_factory": get_session_factory(),
             "fake_aws": fake_aws,
+            "fake_malware": fake_malware,
             "webhook_secret": "whsec_test",
         }
 

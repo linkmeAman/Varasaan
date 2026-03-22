@@ -28,6 +28,38 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
 
 ---
 
+## Synchronized Delivery Model (Locked For Remaining Work)
+
+- Standing streams:
+  - `Backend`: schema, models, services, routes, backend tests.
+  - `Frontend`: hooks, screens, UX states, and e2e/spec updates.
+  - `Sync / QA / Docs`: `openapi.yaml`, generated client/types, contract verification, and updates to `PROGRESS_CHECKLIST.md`, `PRODUCT_DEVELOPMENT.md`, `CHANGELOG.md`, and `INTEGRATION_CHECKLIST.md`.
+- Default commit order: backend -> sync / QA / docs -> frontend -> optional integration fix.
+- Default branch pattern: `codex/<phase>-backend`, `codex/<phase>-sync`, `codex/<phase>-frontend`.
+- Backend owns public interface changes.
+- Frontend never handwrites request/response shapes; it consumes generated client/types only.
+- A phase is not complete until implementation, generated artifacts, verification, and docs land together.
+
+## Active Execution Sequence (2026)
+
+- Phase A - After-Loss Hardening Finish:
+  - Add death-certificate metadata stripping, a risk-based manual review state, internal review tooling, review-metadata fields on case summaries, and end-to-end hardening coverage.
+  - Exit gate: every activation resolves to `active`, `pending review`, or `rejected review` without manual DB intervention.
+- Phase B - Payment & Checkout Finish:
+  - Leave backend payment APIs unchanged unless the frontend reveals a real blocker, then ship the real checkout flow, Razorpay polling, retry states, and entitlement refresh.
+  - Exit gate: a real paid staging order unlocks the intended UI.
+- Phase C - Family Workspace:
+  - Expand case collaboration with participants, assignment, comments, activity visibility, and task-status notifications.
+  - Exit gate: multiple participants can collaborate on one active case with audit visibility.
+- Phase D - Crypto Inheritance Kit:
+  - Add planning-mode crypto models, activation snapshots, and executor guidance while never storing secrets.
+  - Exit gate: crypto planning snapshots cleanly into after-loss mode.
+- Phase E - B2B / Scale Foundations:
+  - Add multi-tenant partner primitives, signed webhooks, usage reporting, and admin surfaces before any mobile work starts.
+  - Exit gate: one pilot tenant operates on isolated data with signed webhook integration.
+
+---
+
 ## 📦 Phase 0 — Foundation (Weeks 1–4)
 
 > Goal: Infrastructure up, compliance posture set, zero features but bulletproof base.
@@ -54,11 +86,12 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
           yield session
   ```
 - [ ] `users` — id, email, phone, created_at, deleted_at (soft delete)
-- [ ] `accounts_inventory` — user_id, platform, account_type, access_status, notes
-- [ ] `trusted_contacts` — user_id, contact_name, email, phone, role (executor/viewer)
+- [ ] `inventory_accounts` — user_id, platform, category, username_hint, importance_level
+- [ ] `trusted_contacts` — user_id, contact_name, email, role (executor/viewer/packet_access/recovery_assist)
 - [ ] `documents` — user_id, doc_type, s3_key, encrypted, uploaded_at, expires_at
-- [ ] `cases` — user_id (deceased), executor_id, status, opened_at, closed_at
-- [ ] `tasks` — case_id, platform, task_type, status, evidence_doc_id, updated_at
+- [ ] `cases` — owner_user_id, status, death_certificate_document_id, death_certificate_version_id, activated_at, closed_at
+- [ ] `case_participants` — case_id, trusted_contact_id, role
+- [ ] `case_tasks` — case_id, inventory_account_id, platform, category, priority, status, evidence_doc_id, updated_at
 - [ ] `audit_logs` — entity_type, entity_id, action, actor_id, timestamp, ip_hash
 - [ ] `heartbeats` — user_id, last_checked_in, next_expected, escalation_level
 - [ ] All tables: UUID primary keys, created_at/updated_at timestamps, soft deletes
@@ -94,6 +127,8 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
 ## 📦 Phase 1 — MVP: Planning Mode (Weeks 5–12)
 
 > Goal: A paying user can build their digital inventory and generate an evidence packet. Manual and slightly rough is fine. This is validation.
+>
+> Execution note (March 2026): most planning-mode backend/API work is complete. The remaining Phase 1 delivery slice is Phase B, which is focused on the real checkout frontend and staging payment validation.
 
 ### 1.1 Auth + Onboarding
 - [ ] Email + password signup (bcrypt, min entropy enforced)
@@ -166,33 +201,37 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
 ## 📦 Phase 2 — After-Loss Mode (Weeks 13–22)
 
 > Goal: Executor can manage the full closure process with task tracking, proof capture, and status updates.
+>
+> V1 status (March 2026): the single-executor, trusted-contact-backed activation flow, task workspace, task-scoped evidence upload/download, case-open notifications, executor-driven case closure with 90-day evidence retention cleanup, live printable closure reporting, and recurring-payment bleed-stopper guidance are implemented. The remaining execution order inside this product phase is Phase A hardening, then Phase C collaboration, then Phase D crypto.
 
 ### 2.1 Case Activation Flow
-- [ ] Executor submits death certificate (PDF upload, encrypted)
-- [ ] System validates: file is PDF, under 10MB, metadata stripped
+- [x] Executor submits death certificate (PDF upload, encrypted)
+- [x] System validates: file is PDF and under 10MB
+- [ ] System strips PDF metadata before activation
 - [ ] Optional: manual review step before full activation (for fraud prevention in V1)
-- [ ] Once activated: executor gets full inventory view
-- [ ] Notification sent to all designated contacts that case is open
+- [x] Once activated: executor gets a task-centric workspace generated from inventory snapshots
+- [x] Notification sent to all designated contacts that case is open
 
 ### 2.2 Task Management (Kanban for Grief Ops)
-- [ ] Auto-generate tasks from inventory: one task per account
-- [ ] Task statuses: `Not Started` → `In Progress` → `Submitted` → `Waiting` → `Resolved` / `Escalated`
-- [ ] Per task: notes field, document attachment, date submitted, reference number
-- [ ] Task priority: auto-set based on account importance level from inventory
+- [x] Auto-generate tasks from inventory: one task per account
+- [x] Task statuses: `not_started` → `in_progress` → `submitted` → `waiting` → `resolved` / `escalated`
+- [x] Per task: notes field, date submitted, reference number
+- [x] Per task: document attachment / evidence upload
+- [x] Task priority: auto-set based on account importance level from inventory
 - [ ] "Quick wins" section: accounts that have simple one-click deletion (e.g., minor streaming services)
-- [ ] Filter by: status / platform / category / priority
+- [x] Filter by: status / platform / category / priority
 
 ### 2.3 Evidence & Proof Capture
-- [ ] Executor can upload confirmation emails / screenshots per task
-- [ ] Auto-tag uploads by platform + date
-- [ ] Closure proof stored encrypted for 90 days post-case (then auto-deleted per retention policy)
-- [ ] Exportable "Closure Report" PDF: all tasks, statuses, evidence references, timeline
+- [x] Executor can upload confirmation emails / screenshots per task
+- [x] Auto-tag uploads by platform + date in task-scoped evidence/activity views
+- [x] Closure proof stored encrypted for 90 days post-case (then auto-deleted per retention policy)
+- [x] Live printable "Closure Report" web view: tasks, statuses, clean evidence references, timeline
 
 ### 2.4 Subscription Bleeding Stopper
-- [ ] Checklist of recurring payments to cancel (from inventory)
-- [ ] For credit/debit card-linked subscriptions: bank dispute letter template
-- [ ] For UPI autopay: guide to revoke through NPCI / bank app
-- [ ] Estimated monthly bleed shown (user inputs amount during planning mode)
+- [x] Checklist of recurring payments to cancel (from inventory)
+- [x] For credit/debit card-linked subscriptions: bank dispute letter template
+- [x] For UPI autopay: guide to revoke through NPCI / bank app
+- [x] Estimated monthly bleed shown (user inputs amount during planning mode)
 
 ### 2.5 Family Workspace (Collaboration)
 - [ ] Multiple executors / family members can be added to a case
@@ -216,6 +255,8 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
 ---
 
 ## 📦 Phase 3 — Scale & B2B (Months 6–12)
+
+> Execution note (March 2026): active delivery work should not enter this phase until Phases A-D above are complete. Phase E is the first delivery slice in this section, and mobile work does not start until that foundation stabilizes.
 
 ### 3.1 Platform Partnerships
 - [ ] Apply to Google's Trusted Partner program (if applicable)
@@ -327,6 +368,7 @@ A feature is DONE only when:
 5. ✅ DPDP consent/retention impact assessed
 6. ✅ Deployed to staging and smoke-tested
 7. ✅ Product owner signed off
+8. ✅ Contract, generated artifacts, Playwright coverage, and the four phase docs are updated in the same phase sequence when user-visible or public-interface behavior changes
 
 ---
 

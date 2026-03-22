@@ -2,12 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { ArrowRight, ShieldAlert } from 'lucide-react';
 
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { apiClient } from '../lib/api-client';
+import { getCsrfTokenFromCookie, waitForCsrfTokenRefresh } from '../lib/session';
 
 function extractErrorMessage(error: unknown, fallback: string): string {
   if (typeof error === 'object' && error !== null) {
@@ -26,7 +27,6 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState('');
 
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export default function Login() {
           return;
         }
         const next = searchParams.get('next') || '/dashboard';
-        router.replace(next);
+        window.location.replace(next);
       } catch {
         // stay on login page
       }
@@ -48,7 +48,7 @@ export default function Login() {
     return () => {
       mounted = false;
     };
-  }, [router, searchParams]);
+  }, [searchParams]);
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -56,14 +56,16 @@ export default function Login() {
     setFeedback('');
 
     try {
+      const previousCsrfToken = getCsrfTokenFromCookie();
       await apiClient.login({
         body: {
           email: email.trim(),
           password,
         },
       });
+      await waitForCsrfTokenRefresh(previousCsrfToken);
       const next = searchParams.get('next') || '/dashboard';
-      router.push(next);
+      window.location.assign(next);
     } catch (error) {
       setFeedback(extractErrorMessage(error, 'Unable to login. Check your credentials and try again.'));
     } finally {

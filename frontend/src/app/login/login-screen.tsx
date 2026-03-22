@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { ArrowRight, ShieldAlert } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../lib/auth-context';
+import { getCsrfTokenFromCookie, waitForCsrfTokenRefresh } from '../../lib/session';
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email address.'),
@@ -20,10 +21,10 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginScreen() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { user, login, error: authError, isLoading: authLoading } = useAuth();
   const [feedback, setFeedback] = useState('');
+  const [isLoginRedirecting, setIsLoginRedirecting] = useState(false);
 
   const {
     register,
@@ -38,22 +39,32 @@ export function LoginScreen() {
   });
 
   useEffect(() => {
-    if (!authLoading && user) {
-      const next = searchParams.get('next') || '/dashboard';
-      router.replace(next);
+    if (isLoginRedirecting || authLoading || !user) {
+      return;
     }
-  }, [authLoading, router, searchParams, user]);
+
+    const next = searchParams.get('next') || '/dashboard';
+    if (typeof window !== 'undefined') {
+      window.location.replace(next);
+    }
+  }, [authLoading, isLoginRedirecting, searchParams, user]);
 
   const onSubmit = handleSubmit(async (values) => {
     setFeedback('');
+    setIsLoginRedirecting(true);
     try {
+      const previousCsrfToken = getCsrfTokenFromCookie();
       await login({
         email: values.email.trim(),
         password: values.password,
       });
+      await waitForCsrfTokenRefresh(previousCsrfToken);
       const next = searchParams.get('next') || '/dashboard';
-      router.push(next);
+      if (typeof window !== 'undefined') {
+        window.location.assign(next);
+      }
     } catch {
+      setIsLoginRedirecting(false);
       setFeedback('Unable to login. Check your credentials and try again.');
     }
   });
@@ -101,4 +112,3 @@ export function LoginScreen() {
     </div>
   );
 }
-

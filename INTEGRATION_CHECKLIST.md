@@ -1,8 +1,47 @@
 # Integration Checklist
 
-- Generated on: 2026-03-16 18:55 UTC
+- Updated on: 2026-03-22
 - Scope: frontend-backend contract sync for `packages/shared/openapi/openapi.yaml`
-- Result: contract, generated frontend client, cookie-auth flow, and backend route + enum checks are aligned.
+- Result: contract, generated frontend client, cookie-auth flow, and backend route coverage are aligned for planning-mode and executor case flows.
+
+## Sync / QA / Docs Operating Model
+
+- Sync stream owns `PROGRESS_CHECKLIST.md`, `PRODUCT_DEVELOPMENT.md`, `CHANGELOG.md`, and `INTEGRATION_CHECKLIST.md`.
+- Backend is the source of truth for public interface changes.
+- `packages/shared/openapi/openapi.yaml` must be updated before any generated artifact is regenerated.
+- Frontend consumes generated request/response types only; it does not handwrite contract shapes.
+- Internal-only routes stay out of the public OpenAPI surface.
+- Phase completion is blocked if implementation, contract, generated artifacts, and docs disagree.
+
+## Local Verification Entry Point
+
+- Preferred local command:
+  - `npm run verify:sync`
+- Add phase-specific backend tests when needed:
+  - `npm run verify:sync -- --backend-test backend/tests/test_api_integration_flows.py`
+  - `npm run verify:sync -- --backend-test backend/tests/test_api_integration_flows.py --backend-test backend/tests/test_case_flows.py`
+- Optional Playwright execution remains available through `npm run verify:sync -- --run-e2e --playwright-spec <spec>` or the existing frontend e2e commands, but a real runner/staging pass is still required for high-confidence frontend validation.
+
+## Per-Phase Verification Checklist
+
+- Pull the backend branch after API or schema changes.
+- Update `packages/shared/openapi/openapi.yaml` first, then regenerate:
+  - `packages/shared/openapi/openapi.generated.json`
+  - `frontend/src/lib/generated/api-client.ts`
+  - `frontend/src/api/openapi-types.ts`
+- Run:
+  - `python -m pytest backend/tests/test_contract_sync.py`
+  - relevant backend integration tests for the phase
+  - `npm run typecheck`
+  - `npm run lint`
+- If frontend behavior changes for users, confirm the relevant Playwright spec is updated.
+- Update `PROGRESS_CHECKLIST.md`, `PRODUCT_DEVELOPMENT.md`, `CHANGELOG.md`, and `INTEGRATION_CHECKLIST.md` in the same phase.
+
+## Current Contract Boundaries
+
+- The public contract currently covers planning-mode and single-executor after-loss flows.
+- Internal manual-review endpoints remain intentionally excluded from public OpenAPI until Phase A lands its public case-summary metadata changes.
+- Family-workspace, crypto, and B2B payloads are intentionally absent until their respective delivery phases start.
 
 ## Endpoint-by-Endpoint Status
 
@@ -23,6 +62,13 @@
 | `POST` | `/api/v1/auth/recovery/confirm` | `recoveryConfirm` | `RecoveryConfirmRequest` | `ApiMessage` | Contract + type sync | Synced |
 | `POST` | `/api/v1/auth/jurisdiction/confirm` | `confirmJurisdiction` | `JurisdictionConfirmRequest` | `ApiMessage` | Contract + type sync | Synced |
 | `GET` | `/api/v1/auth/me` | `currentUser` | `-` | `UserSessionResponse` | Integration test | Synced |
+| `GET` | `/api/v1/cases` | `listAccessibleCases` | `-` | `CaseSummaryResponse[]` | Integration test | Synced |
+| `GET` | `/api/v1/cases/{caseId}` | `getCaseSummary` | `-` | `CaseSummaryResponse` | Contract + type sync | Synced |
+| `POST` | `/api/v1/cases/{caseId}/death-certificate/uploads/init` | `initCaseDeathCertificateUpload` | `CaseActivationUploadInitRequest` | `CaseActivationUploadInitResponse` | Integration test | Synced |
+| `POST` | `/api/v1/cases/{caseId}/activate` | `activateCase` | `CaseActivationConfirmRequest` | `CaseSummaryResponse` | Integration test | Synced |
+| `POST` | `/api/v1/cases/{caseId}/close` | `closeCase` | `-` | `CaseSummaryResponse` | Integration test | Synced |
+| `GET` | `/api/v1/cases/{caseId}/tasks` | `listCaseTasks` | `status/platform/category/priority (query)` | `CaseTaskResponse[]` | Integration test | Synced |
+| `PATCH` | `/api/v1/cases/{caseId}/tasks/{taskId}` | `patchCaseTask` | `CaseTaskPatchRequest` | `CaseTaskResponse` | Integration test | Synced |
 | `GET` | `/api/v1/legal/policies` | `listPolicies` | `-` | `LegalPolicyResponse[]` | Contract + type sync | Synced |
 | `POST` | `/api/v1/legal/policies` | `createPolicy` | `LegalPolicyCreateRequest` | `LegalPolicyResponse` | Contract + type sync | Synced |
 | `POST` | `/api/v1/documents/uploads/init` | `initDocumentUpload` | `UploadInitRequest` | `UploadInitResponse` | Integration test | Synced |
@@ -54,10 +100,11 @@
 - Frontend payload/request-response types are regenerated from the same OpenAPI source into `frontend/src/lib/generated/api-client.ts` and `frontend/src/api/openapi-types.ts`.
 - Browser clients use credentialed cookies plus double-submit CSRF headers for mutating auth/session requests.
 - Backend route surface is validated against the same contract in `backend/tests/test_contract_sync.py` (path+method parity, excluding intentionally hidden testing routes).
-- Shared enum/status sets are validated in `backend/tests/test_contract_sync.py` for: `PolicyType`, `RecoveryMode`, `TrustedContactRole`, `TrustedContactStatus`, `PacketJobStatus`, `ExportJobStatus`, `PaymentStatus`.
+- Generated artifacts now include executor-case payloads and enums such as `TrustedContactRole`, `CaseStatus`, and `CaseTaskStatus`, along with closed-case retention metadata on summary/report payloads.
 
 ## Known Gaps
 
 - Hidden mock-storage routes under `/api/v1/testing/*` are test-only and intentionally excluded from public OpenAPI.
+- Manual review internals and multi-participant case collaboration are intentionally excluded from the current public case contract surface until their execution phases land.
 - Live Razorpay/Postmark validation still depends on staging credentials and must be executed as part of the launch runbook.
 - Alert routing is operationally validated through staging smoke checks; it is not exercised by unit or contract tests.

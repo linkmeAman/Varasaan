@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { apiClient, type InventoryResponse } from './api-client';
+import { apiClient, type InventoryResponse, type RecurringPaymentRail } from './api-client';
 import { readApiErrorMessage } from './api-errors';
 import { useAuth } from './auth-context';
 
@@ -11,14 +11,38 @@ export type InventoryDraft = {
   category: string;
   usernameHint: string;
   importanceLevel: number;
+  isRecurringPayment: boolean;
+  paymentRail: RecurringPaymentRail | '';
+  monthlyAmountInr: string;
+  paymentReferenceHint: string;
 };
 
+function parseInrToPaise(value: string): number | null {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+  const match = normalized.match(/^(\d+)(?:\.(\d{1,2}))?$/);
+  if (!match) {
+    return null;
+  }
+
+  const rupees = Number(match[1]);
+  const paise = Number((match[2] || '').padEnd(2, '0'));
+  return rupees * 100 + paise;
+}
+
 function normalizeDraft(draft: InventoryDraft): InventoryDraft {
+  const monthlyAmount = draft.monthlyAmountInr.trim();
   return {
     platform: draft.platform.trim(),
     category: draft.category.trim(),
     usernameHint: draft.usernameHint.trim(),
     importanceLevel: Math.max(1, Math.min(5, Number(draft.importanceLevel) || 3)),
+    isRecurringPayment: Boolean(draft.isRecurringPayment),
+    paymentRail: draft.isRecurringPayment ? draft.paymentRail : '',
+    monthlyAmountInr: draft.isRecurringPayment ? monthlyAmount : '',
+    paymentReferenceHint: draft.isRecurringPayment ? draft.paymentReferenceHint.trim() : '',
   };
 }
 
@@ -72,6 +96,15 @@ export function useInventoryWorkspace() {
       setError('Platform and category are required.');
       return null;
     }
+    const monthlyAmountPaise = next.isRecurringPayment ? parseInrToPaise(next.monthlyAmountInr) : null;
+    if (next.isRecurringPayment && !next.paymentRail) {
+      setError('Choose a payment rail for recurring payments.');
+      return null;
+    }
+    if (next.isRecurringPayment && monthlyAmountPaise === null) {
+      setError('Enter a valid monthly amount in INR for recurring payments.');
+      return null;
+    }
 
     setSubmittingAction('create');
     setFeedback('');
@@ -84,6 +117,10 @@ export function useInventoryWorkspace() {
       category: next.category,
       username_hint: next.usernameHint || null,
       importance_level: next.importanceLevel,
+      is_recurring_payment: next.isRecurringPayment,
+      payment_rail: next.isRecurringPayment ? next.paymentRail || null : null,
+      monthly_amount_paise: next.isRecurringPayment ? monthlyAmountPaise : null,
+      payment_reference_hint: next.isRecurringPayment ? next.paymentReferenceHint || null : null,
     };
 
     setAccounts((current) => [optimisticAccount, ...current]);
@@ -94,6 +131,10 @@ export function useInventoryWorkspace() {
           platform: next.platform,
           category: next.category,
           username_hint: next.usernameHint || null,
+          is_recurring_payment: next.isRecurringPayment,
+          payment_rail: next.isRecurringPayment ? next.paymentRail || null : null,
+          monthly_amount_paise: next.isRecurringPayment ? monthlyAmountPaise : null,
+          payment_reference_hint: next.isRecurringPayment ? next.paymentReferenceHint || null : null,
           importance_level: next.importanceLevel,
         },
       });
@@ -116,6 +157,15 @@ export function useInventoryWorkspace() {
       setError('Platform and category are required.');
       return null;
     }
+    const monthlyAmountPaise = next.isRecurringPayment ? parseInrToPaise(next.monthlyAmountInr) : null;
+    if (next.isRecurringPayment && !next.paymentRail) {
+      setError('Choose a payment rail for recurring payments.');
+      return null;
+    }
+    if (next.isRecurringPayment && monthlyAmountPaise === null) {
+      setError('Enter a valid monthly amount in INR for recurring payments.');
+      return null;
+    }
 
     const previous = accounts.find((account) => account.id === accountId);
     if (!previous) {
@@ -133,6 +183,10 @@ export function useInventoryWorkspace() {
       category: next.category,
       username_hint: next.usernameHint || null,
       importance_level: next.importanceLevel,
+      is_recurring_payment: next.isRecurringPayment,
+      payment_rail: next.isRecurringPayment ? next.paymentRail || null : null,
+      monthly_amount_paise: next.isRecurringPayment ? monthlyAmountPaise : null,
+      payment_reference_hint: next.isRecurringPayment ? next.paymentReferenceHint || null : null,
     };
 
     setAccounts((current) => current.map((account) => (account.id === accountId ? optimisticAccount : account)));
@@ -144,6 +198,10 @@ export function useInventoryWorkspace() {
           platform: next.platform,
           category: next.category,
           username_hint: next.usernameHint || null,
+          is_recurring_payment: next.isRecurringPayment,
+          payment_rail: next.isRecurringPayment ? next.paymentRail || null : null,
+          monthly_amount_paise: next.isRecurringPayment ? monthlyAmountPaise : null,
+          payment_reference_hint: next.isRecurringPayment ? next.paymentReferenceHint || null : null,
           importance_level: next.importanceLevel,
         },
       });

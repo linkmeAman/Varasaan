@@ -6,10 +6,12 @@ import { apiClient, type TrustedContactResponse } from './api-client';
 import { readApiErrorMessage } from './api-errors';
 import { useAuth } from './auth-context';
 
+type TrustedContactRole = TrustedContactResponse['role'];
+
 export type TrustedContactDraft = {
   name: string;
   email: string;
-  role: 'viewer' | 'packet_access' | 'recovery_assist';
+  role: TrustedContactRole;
   recoveryEnabled: boolean;
 };
 

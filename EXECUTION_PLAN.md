@@ -4,7 +4,7 @@ This document is the reality-based execution view for the remaining Phase 1 work
 
 Sync sources: status below is derived from the current frontend routes, legacy view layer, backend API surface, generated client artifacts, Playwright coverage, and CI workflows.
 
----
+Every remaining phase is executed in three standing streams:
 
 ## 1. Current Shipped State
 
@@ -30,7 +30,7 @@ Sync sources: status below is derived from the current frontend routes, legacy v
 - There is no dedicated heartbeat model, route surface, OpenAPI contract, worker orchestration, or frontend heartbeat UI.
 - Existing `last_heartbeat` usage in packet jobs is unrelated to the Phase 1 dead-man switch feature.
 
----
+## Phase Sequence
 
 ## 2. Remaining Architecture Refactor Work
 

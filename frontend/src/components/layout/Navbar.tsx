@@ -26,6 +26,7 @@ export default function Navbar() {
 
   const isHome = pathname === '/';
   const isDashboardRoute = pathname?.startsWith('/dashboard');
+  const isExecutorRoute = pathname?.startsWith('/executor');
   const hasSession = Boolean(user);
 
   const handleLogout = async () => {
@@ -33,7 +34,7 @@ export default function Navbar() {
     router.push('/login');
   };
 
-  if (isDashboardRoute) {
+  if (isDashboardRoute || isExecutorRoute) {
     return null;
   }
 
