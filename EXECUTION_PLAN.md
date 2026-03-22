@@ -37,6 +37,7 @@ Backend:
 - Add risk-based manual review state and internal review endpoints.
 - Keep the public case lifecycle stable by extending case summary payloads with review metadata instead of creating a second public lifecycle.
 - Add integration coverage for clean activation, queued review, approval, rejection, and replacement upload.
+- Status (2026-03-22): implemented and verified on `codex/phase-a-backend`.
 - Commit: `feat(api): add activation sanitization and review flow`
 
 Sync / QA / Docs:
@@ -45,12 +46,14 @@ Sync / QA / Docs:
 - Regenerate `packages/shared/openapi/openapi.generated.json`, `frontend/src/lib/generated/api-client.ts`, and `frontend/src/api/openapi-types.ts`.
 - Update status docs to mark hardening complete.
 - Run contract sync plus backend regression coverage.
+- Status (2026-03-22): next active stream.
 - Commit: `chore(contract): sync activation review schema and docs`
 
 Frontend:
 - Add executor states for `pending review` and `rejected review`.
 - Show the review reason/note and the replacement-upload path.
 - Keep active and closed flows unchanged.
+- Status (2026-03-22): blocked until the sync commit lands.
 - Commit: `feat(web): surface activation review states`
 
 Exit gate:
@@ -159,10 +162,10 @@ Exit gate:
 - The repo previously had no explicit sync-owner process; this plan formalizes that stream.
 - The repo previously had no root-level local sync verification entrypoint; `npm run verify:sync` now covers the shared contract/type/lint/typecheck path and accepts phase-specific backend test targets.
 - The PR checklist previously did not require the four phase docs to be updated alongside implementation.
-- Internal manual-review tooling is still missing in the implementation.
+- Phase A manual-review tooling is implemented on `codex/phase-a-backend`, but the synced public contract/client artifacts and executor UX still need to land.
 - Payment frontend is still unfinished even though the backend surface exists.
 - Playwright and Vitest results from this sandbox are not a substitute for a real runner or staging pass.
-- The current tree already mixes the Phase 2.4 bleed-stopper and closure-hardening work, so the first real commit step should intentionally split or squash that work before the next phase branch set starts.
+- The pre-Phase-A mixed tree has been consolidated into `codex/pre-phase-a-baseline`; the next branch step is Phase A sync, then Phase A frontend.
 
 ## Assumptions
 

@@ -17,29 +17,35 @@ This document tracks shipped state plus the standing three-stream delivery model
 - [x] Backend owns public interface changes.
 - [x] Frontend consumes only generated client/types.
 - [x] Sync stream owns `PROGRESS_CHECKLIST.md`, `PRODUCT_DEVELOPMENT.md`, `CHANGELOG.md`, and `INTEGRATION_CHECKLIST.md`.
-- [ ] Current tree hygiene: the existing Phase 2.4 bleed-stopper and closure-hardening work still needs an intentional split or squash before the next phase branch set starts.
+- [x] Current tree hygiene: the mixed Phase 2.4 and closure-hardening tree was consolidated into `codex/pre-phase-a-baseline`, and the Phase A stream branches were cut from that baseline.
 
 ## Active Phase Queue
 
-### Phase A - After-Loss Hardening Finish (current)
+### Phase A - After-Loss Hardening Finish (in progress)
 
 Target commits:
 - `feat(api): add activation sanitization and review flow`
 - `chore(contract): sync activation review schema and docs`
 - `feat(web): surface activation review states`
 
+Audit snapshot (2026-03-22):
+- Backend stream is implemented and verified on `codex/phase-a-backend`.
+- Sync / QA / Docs is the next active stream.
+- Frontend remains blocked until the synced public contract and generated client/types are available.
+
 Checklist:
-- [ ] Strip death-certificate metadata before activation.
-- [ ] Add risk-based manual review state and internal review endpoints.
-- [ ] Keep the public case lifecycle stable by extending case summary payloads with review metadata.
-- [ ] Add integration coverage for clean activation, queued review, approval, rejection, and replacement upload.
+- [x] Strip death-certificate metadata before activation.
+- [x] Add risk-based manual review state and internal review endpoints.
+- [x] Keep the public case lifecycle stable by extending case summary payloads with review metadata.
+- [x] Add integration coverage for clean activation, queued review, approval, rejection, and replacement upload.
 - [ ] Regenerate public contract/client artifacts without exposing internal review routes.
 - [ ] Add executor UX states for `pending review` and `rejected review`.
 - [ ] Show review reason/note and the replacement-upload path.
 
 Exit gate:
-- [ ] Every activation ends in exactly one of `active`, `pending review`, or `rejected review`.
-- [ ] No manual DB intervention is required.
+- [x] Backend enforces exactly one of `active`, `pending review`, or `rejected review`.
+- [x] Backend review tooling avoids manual DB intervention for queue, approve, reject, and replacement-upload flows.
+- [ ] Public contract sync, generated artifacts, docs, and executor UX are still pending.
 
 ### Phase B - Payment & Checkout Finish (next)
 
@@ -108,7 +114,7 @@ Exit gate:
 
 ## Immediate Next Steps
 
-1. Intentionally split or squash the already-mixed Phase 2.4 and closure-hardening work before opening the next set of stream branches.
-2. Land Phase A backend work first so the review-state contract is stable before any generated-client or frontend changes.
-3. Land the Phase A sync commit second: update `openapi.yaml`, regenerate artifacts, run sync verification, and update the four owned docs.
-4. Start the Phase A frontend work only after the sync commit is available, then move directly to Phase B checkout completion.
+1. Switch to `codex/phase-a-sync` and update `packages/shared/openapi/openapi.yaml` for the new public case-summary review fields only.
+2. Regenerate `packages/shared/openapi/openapi.generated.json`, `frontend/src/lib/generated/api-client.ts`, and `frontend/src/api/openapi-types.ts`, then rerun `npm run verify:sync -- backend/tests/test_api_integration_flows.py backend/tests/test_case_flows.py`.
+3. Update the four sync-owned docs to mark the public contract synced while keeping `/api/v1/internal/case-reviews/*` out of OpenAPI.
+4. Switch to `codex/phase-a-frontend` and ship executor `pending review` / `rejected review` states, review reason/note display, and replacement upload UX, then move to Phase B checkout completion.

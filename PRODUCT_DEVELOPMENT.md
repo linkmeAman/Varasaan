@@ -42,6 +42,7 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
 
 ## Active Execution Sequence (2026)
 
+- Audit snapshot (2026-03-22): the pre-Phase-A baseline has been consolidated, and the Phase A backend hardening slice is implemented and verified on `codex/phase-a-backend`. The next action is the sync/public-contract stream, followed by the frontend executor-state work.
 - Phase A - After-Loss Hardening Finish:
   - Add death-certificate metadata stripping, a risk-based manual review state, internal review tooling, review-metadata fields on case summaries, and end-to-end hardening coverage.
   - Exit gate: every activation resolves to `active`, `pending review`, or `rejected review` without manual DB intervention.
@@ -202,13 +203,13 @@ Testing          → pytest + pytest-asyncio + httpx (AsyncClient)
 
 > Goal: Executor can manage the full closure process with task tracking, proof capture, and status updates.
 >
-> V1 status (March 2026): the single-executor, trusted-contact-backed activation flow, task workspace, task-scoped evidence upload/download, case-open notifications, executor-driven case closure with 90-day evidence retention cleanup, live printable closure reporting, and recurring-payment bleed-stopper guidance are implemented. The remaining execution order inside this product phase is Phase A hardening, then Phase C collaboration, then Phase D crypto.
+> V1 status (March 2026): the single-executor, trusted-contact-backed activation flow, task workspace, task-scoped evidence upload/download, case-open notifications, executor-driven case closure with 90-day evidence retention cleanup, live printable closure reporting, and recurring-payment bleed-stopper guidance are implemented. The Phase A backend hardening slice is also implemented on `codex/phase-a-backend` with metadata stripping, review-state internals, and regression coverage. The remaining execution order is the Phase A sync slice, the Phase A frontend slice, then Phase B checkout completion, Phase C collaboration, and Phase D crypto.
 
 ### 2.1 Case Activation Flow
 - [x] Executor submits death certificate (PDF upload, encrypted)
 - [x] System validates: file is PDF and under 10MB
-- [ ] System strips PDF metadata before activation
-- [ ] Optional: manual review step before full activation (for fraud prevention in V1)
+- [x] System strips PDF metadata before activation
+- [x] Risk-based manual review queues metadata-flagged certificates before full activation
 - [x] Once activated: executor gets a task-centric workspace generated from inventory snapshots
 - [x] Notification sent to all designated contacts that case is open
 

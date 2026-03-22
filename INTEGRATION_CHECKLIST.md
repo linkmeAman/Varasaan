@@ -2,7 +2,7 @@
 
 - Updated on: 2026-03-22
 - Scope: frontend-backend contract sync for `packages/shared/openapi/openapi.yaml`
-- Result: contract, generated frontend client, cookie-auth flow, and backend route coverage are aligned for planning-mode and executor case flows.
+- Result: contract, generated frontend client, cookie-auth flow, and backend route coverage are aligned for the shipped planning-mode and executor baseline. Phase A backend hardening is implemented and verified on `codex/phase-a-backend`, but the public contract artifacts for the new case review metadata are not regenerated yet.
 
 ## Sync / QA / Docs Operating Model
 
@@ -40,8 +40,16 @@
 ## Current Contract Boundaries
 
 - The public contract currently covers planning-mode and single-executor after-loss flows.
-- Internal manual-review endpoints remain intentionally excluded from public OpenAPI until Phase A lands its public case-summary metadata changes.
+- The backend now implements internal manual-review routes, but only the public case-summary review metadata is intended to enter OpenAPI during Phase A sync.
+- Internal manual-review endpoints remain intentionally excluded from public OpenAPI.
 - Family-workspace, crypto, and B2B payloads are intentionally absent until their respective delivery phases start.
+
+## Audit Snapshot (2026-03-22)
+
+- Baseline hygiene is resolved: `codex/pre-phase-a-baseline` now holds the consolidated pre-Phase-A state and the stream branches were cut from it.
+- Phase A backend is implemented on `codex/phase-a-backend`: PDF metadata stripping, review-state persistence, hidden `/api/v1/internal/case-reviews/*` endpoints, review activity events, and the schema migration are present.
+- Verification passed on this branch with `npm run verify:sync -- backend/tests/test_api_integration_flows.py backend/tests/test_case_flows.py`.
+- The remaining sync gap is explicit: `packages/shared/openapi/openapi.yaml`, `packages/shared/openapi/openapi.generated.json`, `frontend/src/lib/generated/api-client.ts`, and `frontend/src/api/openapi-types.ts` still need the new public case-summary review fields.
 
 ## Endpoint-by-Endpoint Status
 
@@ -62,11 +70,11 @@
 | `POST` | `/api/v1/auth/recovery/confirm` | `recoveryConfirm` | `RecoveryConfirmRequest` | `ApiMessage` | Contract + type sync | Synced |
 | `POST` | `/api/v1/auth/jurisdiction/confirm` | `confirmJurisdiction` | `JurisdictionConfirmRequest` | `ApiMessage` | Contract + type sync | Synced |
 | `GET` | `/api/v1/auth/me` | `currentUser` | `-` | `UserSessionResponse` | Integration test | Synced |
-| `GET` | `/api/v1/cases` | `listAccessibleCases` | `-` | `CaseSummaryResponse[]` | Integration test | Synced |
-| `GET` | `/api/v1/cases/{caseId}` | `getCaseSummary` | `-` | `CaseSummaryResponse` | Contract + type sync | Synced |
+| `GET` | `/api/v1/cases` | `listAccessibleCases` | `-` | `CaseSummaryResponse[]` | Backend verified; public schema regen pending | Phase A sync pending |
+| `GET` | `/api/v1/cases/{caseId}` | `getCaseSummary` | `-` | `CaseSummaryResponse` | Backend verified; public schema regen pending | Phase A sync pending |
 | `POST` | `/api/v1/cases/{caseId}/death-certificate/uploads/init` | `initCaseDeathCertificateUpload` | `CaseActivationUploadInitRequest` | `CaseActivationUploadInitResponse` | Integration test | Synced |
-| `POST` | `/api/v1/cases/{caseId}/activate` | `activateCase` | `CaseActivationConfirmRequest` | `CaseSummaryResponse` | Integration test | Synced |
-| `POST` | `/api/v1/cases/{caseId}/close` | `closeCase` | `-` | `CaseSummaryResponse` | Integration test | Synced |
+| `POST` | `/api/v1/cases/{caseId}/activate` | `activateCase` | `CaseActivationConfirmRequest` | `CaseSummaryResponse` | Backend verified; public schema regen pending | Phase A sync pending |
+| `POST` | `/api/v1/cases/{caseId}/close` | `closeCase` | `-` | `CaseSummaryResponse` | Backend verified; public schema regen pending | Phase A sync pending |
 | `GET` | `/api/v1/cases/{caseId}/tasks` | `listCaseTasks` | `status/platform/category/priority (query)` | `CaseTaskResponse[]` | Integration test | Synced |
 | `PATCH` | `/api/v1/cases/{caseId}/tasks/{taskId}` | `patchCaseTask` | `CaseTaskPatchRequest` | `CaseTaskResponse` | Integration test | Synced |
 | `GET` | `/api/v1/legal/policies` | `listPolicies` | `-` | `LegalPolicyResponse[]` | Contract + type sync | Synced |
@@ -101,10 +109,12 @@
 - Browser clients use credentialed cookies plus double-submit CSRF headers for mutating auth/session requests.
 - Backend route surface is validated against the same contract in `backend/tests/test_contract_sync.py` (path+method parity, excluding intentionally hidden testing routes).
 - Generated artifacts now include executor-case payloads and enums such as `TrustedContactRole`, `CaseStatus`, and `CaseTaskStatus`, along with closed-case retention metadata on summary/report payloads.
+- The current `verify:sync` path validates route parity, backend regressions, frontend typecheck, and lint, but it does not by itself prove that newly added response fields were regenerated into the public client artifacts. Phase A sync still needs to carry the case review metadata into OpenAPI and the generated frontend types.
 
 ## Known Gaps
 
 - Hidden mock-storage routes under `/api/v1/testing/*` are test-only and intentionally excluded from public OpenAPI.
-- Manual review internals and multi-participant case collaboration are intentionally excluded from the current public case contract surface until their execution phases land.
+- Internal manual-review endpoints are intentionally excluded from the public OpenAPI surface, and the public case-summary review fields are still waiting on the dedicated Phase A sync update.
+- Multi-participant case collaboration is intentionally excluded from the current public case contract surface until Phase C begins.
 - Live Razorpay/Postmark validation still depends on staging credentials and must be executed as part of the launch runbook.
 - Alert routing is operationally validated through staging smoke checks; it is not exercised by unit or contract tests.
