@@ -410,7 +410,13 @@ def main() -> None:
     spec: dict[str, Any]
     source_label: str
 
-    if yaml is not None and yaml_path.exists():
+    if yaml_path.exists():
+        if yaml is None:
+            raise ModuleNotFoundError(
+                "PyYAML is required to read packages/shared/openapi/openapi.yaml. "
+                "Run this script with the backend uv environment (uv run --project backend ...) "
+                "or install pyyaml in the active Python environment."
+            )
         spec = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
         source_label = "packages/shared/openapi/openapi.yaml"
     elif json_path.exists():
