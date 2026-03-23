@@ -3112,16 +3112,15 @@ export const openApiDocument = {
       "PaymentCheckoutRequest": {
         "type": "object",
         "required": [
-          "amount_paise"
+          "tier"
         ],
         "properties": {
-          "amount_paise": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "currency": {
+          "tier": {
             "type": "string",
-            "default": "INR"
+            "enum": [
+              "essential",
+              "executor"
+            ]
           }
         }
       },
@@ -3131,6 +3130,7 @@ export const openApiDocument = {
           "order_id",
           "provider",
           "provider_order_id",
+          "tier",
           "amount_paise",
           "currency",
           "status"
@@ -3149,6 +3149,13 @@ export const openApiDocument = {
             "type": "string",
             "nullable": true
           },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "essential",
+              "executor"
+            ]
+          },
           "amount_paise": {
             "type": "integer"
           },
@@ -3156,14 +3163,7 @@ export const openApiDocument = {
             "type": "string"
           },
           "status": {
-            "type": "string",
-            "enum": [
-              "created",
-              "authorized",
-              "captured",
-              "failed",
-              "refunded"
-            ]
+            "type": "string"
           }
         }
       },

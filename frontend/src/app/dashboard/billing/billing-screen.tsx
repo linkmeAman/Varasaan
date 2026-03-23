@@ -1,14 +1,11 @@
 'use client';
 
 import { CreditCard, RefreshCw } from 'lucide-react';
-import { useState } from 'react';
 
 import { Button } from '../../../components/ui/Button';
-import { Input } from '../../../components/ui/Input';
 import { useBillingWorkspace } from '../../../lib/use-billing-workspace';
 
 export function BillingScreen() {
-  const [amountRupees, setAmountRupees] = useState('999');
   const { checkout, paymentStatus, feedback, error, loadingAction, isVerifying, createCheckout, pollPaymentStatus } =
     useBillingWorkspace();
 
@@ -18,7 +15,7 @@ export function BillingScreen() {
         <div>
           <p className="item-badge">Plans</p>
           <h2 className="dash-title">Plans and Billing</h2>
-          <p className="dash-subtitle">This MVP screen validates checkout flow while tiered plans, entitlements, and invoices are still in progress.</p>
+          <p className="dash-subtitle">Choose a plan to get started. Essential covers planning tools; Executor adds post-loss case management.</p>
         </div>
       </div>
 
@@ -26,11 +23,13 @@ export function BillingScreen() {
       {error ? <p className="input-error-msg">{error}</p> : null}
 
       <section className="inventory-panel glass-panel">
-        <h3 className="section-title">Start Payment Check</h3>
+        <h3 className="section-title">Select a Plan</h3>
         <div className="inventory-actions-row">
-          <Input label="Amount (INR)" type="number" min={1} value={amountRupees} onChange={(event) => setAmountRupees(event.target.value)} />
-          <Button type="button" onClick={() => void createCheckout(amountRupees)} isLoading={loadingAction === 'checkout'}>
-            <CreditCard size={16} /> Start Payment Check
+          <Button type="button" onClick={() => void createCheckout('essential')} isLoading={loadingAction === 'checkout'}>
+            <CreditCard size={16} /> Essential &mdash; &#x20B9;999/month
+          </Button>
+          <Button type="button" onClick={() => void createCheckout('executor')} isLoading={loadingAction === 'checkout'}>
+            <CreditCard size={16} /> Executor &mdash; &#x20B9;2,499/month
           </Button>
         </div>
       </section>

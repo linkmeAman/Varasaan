@@ -1,9 +1,12 @@
 from pydantic import BaseModel
+from typing import Literal
+
+
+PaymentTier = Literal["essential", "executor"]
 
 
 class PaymentCheckoutRequest(BaseModel):
-    amount_paise: int
-    currency: str = "INR"
+    tier: PaymentTier
 
 
 class PaymentCheckoutResponse(BaseModel):
@@ -11,6 +14,7 @@ class PaymentCheckoutResponse(BaseModel):
     provider: str
     provider_order_id: str
     checkout_key_id: str | None = None
+    tier: PaymentTier
     amount_paise: int
     currency: str
     status: str
