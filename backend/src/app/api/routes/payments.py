@@ -33,6 +33,7 @@ async def create_checkout(
         provider="razorpay",
         provider_order_id=payment.order_id,
         checkout_key_id=settings.razorpay_key_id,
+        tier=payload.tier,
         amount_paise=payment.amount_paise,
         currency=payment.currency,
         status=payment.latest_status.value,

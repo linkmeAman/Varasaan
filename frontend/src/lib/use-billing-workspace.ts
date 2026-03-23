@@ -82,19 +82,14 @@ export function useBillingWorkspace() {
     }
   };
 
-  const createCheckout = async (amountRupees: string) => {
+  const createCheckout = async (tier: 'essential' | 'executor') => {
     setLoadingAction('checkout');
     setFeedback('');
     setError('');
 
-    const amountPaise = Math.max(100, Math.round((Number(amountRupees) || 0) * 100));
-
     try {
       const created = await apiClient.createCheckout({
-        body: {
-          amount_paise: amountPaise,
-          currency: 'INR',
-        },
+        body: { tier },
       });
 
       setCheckout(created);

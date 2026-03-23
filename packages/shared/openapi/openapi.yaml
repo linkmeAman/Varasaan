@@ -1888,20 +1888,20 @@ components:
     PaymentCheckoutRequest:
       type: object
       required:
-      - amount_paise
+      - tier
       properties:
-        amount_paise:
-          type: integer
-          minimum: 1
-        currency:
+        tier:
           type: string
-          default: INR
+          enum:
+          - essential
+          - executor
     PaymentCheckoutResponse:
       type: object
       required:
       - order_id
       - provider
       - provider_order_id
+      - tier
       - amount_paise
       - currency
       - status
@@ -1915,18 +1915,17 @@ components:
         checkout_key_id:
           type: string
           nullable: true
+        tier:
+          type: string
+          enum:
+          - essential
+          - executor
         amount_paise:
           type: integer
         currency:
           type: string
         status:
           type: string
-          enum:
-          - created
-          - authorized
-          - captured
-          - failed
-          - refunded
     PaymentWebhookRequest:
       type: object
       required:

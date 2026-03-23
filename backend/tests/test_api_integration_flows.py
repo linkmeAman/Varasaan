@@ -437,13 +437,16 @@ async def test_payment_checkout_response_contains_provider_metadata(test_context
     create_checkout = await client.post(
         "/api/v1/payments/checkout",
         headers=_auth_header(user["access_token"]),
-        json={"amount_paise": 49900, "currency": "INR"},
+        json={"tier": "essential"},
     )
     assert create_checkout.status_code == 201, create_checkout.text
     body = create_checkout.json()
     assert body["provider"] == "razorpay"
     assert body["provider_order_id"] == body["order_id"]
     assert "checkout_key_id" in body
+    assert body["tier"] == "essential"
+    assert body["amount_paise"] == 99900
+    assert body["currency"] == "INR"
 
 
 @pytest.mark.asyncio
@@ -454,7 +457,7 @@ async def test_payment_webhook_replay_and_out_of_order_handling(test_context):
     create_checkout = await client.post(
         "/api/v1/payments/checkout",
         headers=_auth_header(user["access_token"]),
-        json={"amount_paise": 99900, "currency": "INR"},
+        json={"tier": "executor"},
     )
     assert create_checkout.status_code == 201, create_checkout.text
     order_id = create_checkout.json()["order_id"]

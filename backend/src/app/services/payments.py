@@ -20,6 +20,11 @@ STATUS_RANK: dict[PaymentStatus, int] = {
     PaymentStatus.REFUNDED: 4,
 }
 
+TIER_PRICE_PAISE: dict[str, int] = {
+    "essential": 99900,
+    "executor": 249900,
+}
+
 
 def _normalize_status(value: str) -> PaymentStatus:
     normalized = value.lower().strip()
@@ -37,14 +42,16 @@ def _normalize_status(value: str) -> PaymentStatus:
 
 
 async def create_checkout_order(db: AsyncSession, user_id: str, payload: PaymentCheckoutRequest) -> Payment:
-    if payload.amount_paise <= 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Amount must be positive")
+    amount_paise = TIER_PRICE_PAISE.get(payload.tier)
+    if amount_paise is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported tier")
+
     order_id = f"order_{uuid4().hex[:20]}"
     payment = Payment(
         user_id=user_id,
         order_id=order_id,
-        amount_paise=payload.amount_paise,
-        currency=payload.currency,
+        amount_paise=amount_paise,
+        currency="INR",
         latest_status=PaymentStatus.CREATED,
         event_sequence=0,
     )
