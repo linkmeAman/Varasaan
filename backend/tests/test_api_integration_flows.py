@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.config import get_settings
-from app.models import Document, DocumentState
+from app.models import Document, DocumentState, Payment
 from helpers import mark_user_verified, seed_active_policies, sign_webhook
 
 pytestmark = pytest.mark.integration
@@ -434,6 +434,12 @@ async def test_payment_checkout_response_contains_provider_metadata(test_context
     client = test_context["client"]
     user = await _signup_and_login(test_context, email="checkout@example.com", password="StrongPassw0rd!!123")
 
+    me_response = await client.get("/api/v1/auth/me", headers=_auth_header(user["access_token"]))
+    assert me_response.status_code == 200, me_response.text
+    me_body = me_response.json()
+    assert me_body["entitlement_tier"] == "free"
+    assert "entitlement_updated_at" in me_body
+
     create_checkout = await client.post(
         "/api/v1/payments/checkout",
         headers=_auth_header(user["access_token"]),
@@ -447,6 +453,272 @@ async def test_payment_checkout_response_contains_provider_metadata(test_context
     assert body["tier"] == "essential"
     assert body["amount_paise"] == 99900
     assert body["currency"] == "INR"
+
+    async with test_context["session_factory"]() as db:
+        result = await db.execute(select(Payment).where(Payment.order_id == body["order_id"]))
+        stored_payment = result.scalars().first()
+        assert stored_payment is not None
+        assert stored_payment.tier == "essential"
+
+
+@pytest.mark.asyncio
+async def test_payment_entitlement_history_and_invoice_flow(test_context):
+    client = test_context["client"]
+    session_factory = test_context["session_factory"]
+    user = await _signup_and_login(test_context, email="billing@example.com", password="StrongPassw0rd!!123")
+
+    essential_checkout = await client.post(
+        "/api/v1/payments/checkout",
+        headers=_auth_header(user["access_token"]),
+        json={"tier": "essential"},
+    )
+    assert essential_checkout.status_code == 201, essential_checkout.text
+    essential_order_id = essential_checkout.json()["order_id"]
+
+    executor_checkout = await client.post(
+        "/api/v1/payments/checkout",
+        headers=_auth_header(user["access_token"]),
+        json={"tier": "executor"},
+    )
+    assert executor_checkout.status_code == 201, executor_checkout.text
+    executor_order_id = executor_checkout.json()["order_id"]
+
+    essential_captured = {
+        "event_id": "evt_essential_capture",
+        "order_id": essential_order_id,
+        "payment_id": "pay_essential_001",
+        "status": "captured",
+        "event_sequence": 1,
+    }
+    raw_essential, sig_essential = sign_webhook(essential_captured, test_context["webhook_secret"])
+    essential_capture_resp = await client.post(
+        "/api/v1/payments/webhook",
+        content=raw_essential,
+        headers={"Content-Type": "application/json", "X-Razorpay-Signature": sig_essential},
+    )
+    assert essential_capture_resp.status_code == 200, essential_capture_resp.text
+    assert essential_capture_resp.json()["processed"] is True
+
+    executor_captured = {
+        "event_id": "evt_executor_capture",
+        "order_id": executor_order_id,
+        "payment_id": "pay_executor_001",
+        "status": "captured",
+        "event_sequence": 1,
+    }
+    raw_executor, sig_executor = sign_webhook(executor_captured, test_context["webhook_secret"])
+    executor_capture_resp = await client.post(
+        "/api/v1/payments/webhook",
+        content=raw_executor,
+        headers={"Content-Type": "application/json", "X-Razorpay-Signature": sig_executor},
+    )
+    assert executor_capture_resp.status_code == 200, executor_capture_resp.text
+    assert executor_capture_resp.json()["processed"] is True
+
+    me_response = await client.get("/api/v1/auth/me", headers=_auth_header(user["access_token"]))
+    assert me_response.status_code == 200, me_response.text
+    me_body = me_response.json()
+    assert me_body["entitlement_tier"] == "executor"
+    assert me_body["entitlement_updated_at"] is not None
+
+    history_response = await client.get("/api/v1/payments/history", headers=_auth_header(user["access_token"]))
+    assert history_response.status_code == 200, history_response.text
+    history = history_response.json()
+    assert [item["order_id"] for item in history] == [executor_order_id, essential_order_id]
+    assert history[0]["tier"] == "executor"
+    assert history[0]["amount_paise"] == 249900
+    assert history[0]["invoice_available"] is True
+    assert history[0]["invoice_number"]
+    assert history[0]["invoice_issued_at"] is not None
+    assert history[1]["tier"] == "essential"
+    assert history[1]["amount_paise"] == 99900
+    assert history[1]["invoice_available"] is True
+    assert history[1]["invoice_number"]
+
+    invoice_response = await client.get(f"/api/v1/payments/{executor_order_id}/invoice", headers=_auth_header(user["access_token"]))
+    assert invoice_response.status_code == 200, invoice_response.text
+    invoice_body = invoice_response.json()
+    assert invoice_body["download_url"]
+    assert invoice_body["expires_in_seconds"] > 0
+    assert invoice_body["invoice_number"] == history[0]["invoice_number"]
+
+    replay_resp = await client.post(
+        "/api/v1/payments/webhook",
+        content=raw_executor,
+        headers={"Content-Type": "application/json", "X-Razorpay-Signature": sig_executor},
+    )
+    assert replay_resp.status_code == 200, replay_resp.text
+    assert replay_resp.json()["reason"] == "replay"
+
+    duplicate_sequence_event = {
+        "event_id": "evt_executor_dup_seq",
+        "order_id": executor_order_id,
+        "payment_id": "pay_executor_001",
+        "status": "captured",
+        "event_sequence": 1,
+    }
+    raw_duplicate, sig_duplicate = sign_webhook(duplicate_sequence_event, test_context["webhook_secret"])
+    duplicate_resp = await client.post(
+        "/api/v1/payments/webhook",
+        content=raw_duplicate,
+        headers={"Content-Type": "application/json", "X-Razorpay-Signature": sig_duplicate},
+    )
+    assert duplicate_resp.status_code == 200, duplicate_resp.text
+    assert duplicate_resp.json()["reason"] == "duplicate_sequence"
+
+    out_of_order_event = {
+        "event_id": "evt_executor_stale",
+        "order_id": executor_order_id,
+        "payment_id": "pay_executor_001",
+        "status": "failed",
+        "event_sequence": 0,
+    }
+    raw_stale, sig_stale = sign_webhook(out_of_order_event, test_context["webhook_secret"])
+    stale_resp = await client.post(
+        "/api/v1/payments/webhook",
+        content=raw_stale,
+        headers={"Content-Type": "application/json", "X-Razorpay-Signature": sig_stale},
+    )
+    assert stale_resp.status_code == 200, stale_resp.text
+    assert stale_resp.json()["reason"] == "out_of_order"
+
+    regression_event = {
+        "event_id": "evt_executor_regress",
+        "order_id": executor_order_id,
+        "payment_id": "pay_executor_001",
+        "status": "authorized",
+        "event_sequence": 2,
+    }
+    raw_regression, sig_regression = sign_webhook(regression_event, test_context["webhook_secret"])
+    regression_resp = await client.post(
+        "/api/v1/payments/webhook",
+        content=raw_regression,
+        headers={"Content-Type": "application/json", "X-Razorpay-Signature": sig_regression},
+    )
+    assert regression_resp.status_code == 200, regression_resp.text
+    assert regression_resp.json()["reason"] == "status_regression"
+
+    refund_event = {
+        "event_id": "evt_executor_refund",
+        "order_id": executor_order_id,
+        "payment_id": "pay_executor_001",
+        "status": "refunded",
+        "event_sequence": 3,
+    }
+    raw_refund, sig_refund = sign_webhook(refund_event, test_context["webhook_secret"])
+    refund_resp = await client.post(
+        "/api/v1/payments/webhook",
+        content=raw_refund,
+        headers={"Content-Type": "application/json", "X-Razorpay-Signature": sig_refund},
+    )
+    assert refund_resp.status_code == 200, refund_resp.text
+    assert refund_resp.json()["processed"] is True
+
+    me_after_refund = await client.get("/api/v1/auth/me", headers=_auth_header(user["access_token"]))
+    assert me_after_refund.status_code == 200, me_after_refund.text
+    assert me_after_refund.json()["entitlement_tier"] == "essential"
+
+    async with session_factory() as db:
+        result = await db.execute(select(Payment).where(Payment.order_id == executor_order_id))
+        stored_executor = result.scalars().first()
+        assert stored_executor is not None
+        assert stored_executor.invoice_issued_at is not None
+        assert stored_executor.invoice_number is not None
+
+
+@pytest.mark.asyncio
+async def test_payment_entitlement_downgrades_to_free_when_all_paid_orders_refunded(test_context):
+    client = test_context["client"]
+    user = await _signup_and_login(test_context, email="refund@example.com", password="StrongPassw0rd!!123")
+
+    checkout = await client.post(
+        "/api/v1/payments/checkout",
+        headers=_auth_header(user["access_token"]),
+        json={"tier": "essential"},
+    )
+    assert checkout.status_code == 201, checkout.text
+    order_id = checkout.json()["order_id"]
+
+    captured_event = {
+        "event_id": "evt_refund_capture",
+        "order_id": order_id,
+        "payment_id": "pay_refund_001",
+        "status": "captured",
+        "event_sequence": 1,
+    }
+    raw_capture, sig_capture = sign_webhook(captured_event, test_context["webhook_secret"])
+    capture_resp = await client.post(
+        "/api/v1/payments/webhook",
+        content=raw_capture,
+        headers={"Content-Type": "application/json", "X-Razorpay-Signature": sig_capture},
+    )
+    assert capture_resp.status_code == 200, capture_resp.text
+    assert capture_resp.json()["processed"] is True
+
+    refund_event = {
+        "event_id": "evt_refund_refund",
+        "order_id": order_id,
+        "payment_id": "pay_refund_001",
+        "status": "refunded",
+        "event_sequence": 2,
+    }
+    raw_refund, sig_refund = sign_webhook(refund_event, test_context["webhook_secret"])
+    refund_resp = await client.post(
+        "/api/v1/payments/webhook",
+        content=raw_refund,
+        headers={"Content-Type": "application/json", "X-Razorpay-Signature": sig_refund},
+    )
+    assert refund_resp.status_code == 200, refund_resp.text
+    assert refund_resp.json()["processed"] is True
+
+    me_response = await client.get("/api/v1/auth/me", headers=_auth_header(user["access_token"]))
+    assert me_response.status_code == 200, me_response.text
+    assert me_response.json()["entitlement_tier"] == "free"
+
+
+@pytest.mark.asyncio
+async def test_payment_history_is_user_scoped_and_invoice_requires_capture(test_context):
+    client = test_context["client"]
+    owner = await _signup_and_login(test_context, email="history-owner@example.com", password="StrongPassw0rd!!123")
+    intruder = await _signup_and_login(test_context, email="history-intruder@example.com", password="StrongPassw0rd!!456")
+
+    owner_checkout = await client.post(
+        "/api/v1/payments/checkout",
+        headers=_auth_header(owner["access_token"]),
+        json={"tier": "executor"},
+    )
+    assert owner_checkout.status_code == 201, owner_checkout.text
+    owner_order_id = owner_checkout.json()["order_id"]
+
+    owner_history = await client.get("/api/v1/payments/history", headers=_auth_header(owner["access_token"]))
+    assert owner_history.status_code == 200, owner_history.text
+    owner_history_body = owner_history.json()
+    assert [item["order_id"] for item in owner_history_body] == [owner_order_id]
+    assert owner_history_body[0]["invoice_available"] is False
+    assert owner_history_body[0]["invoice_issued_at"] is None
+    assert owner_history_body[0]["invoice_number"] is None
+
+    intruder_history = await client.get("/api/v1/payments/history", headers=_auth_header(intruder["access_token"]))
+    assert intruder_history.status_code == 200, intruder_history.text
+    assert intruder_history.json() == []
+
+    invoice_before_capture = await client.get(
+        f"/api/v1/payments/{owner_order_id}/invoice",
+        headers=_auth_header(owner["access_token"]),
+    )
+    assert invoice_before_capture.status_code in {404, 409}, invoice_before_capture.text
+
+    missing_order_invoice = await client.get(
+        "/api/v1/payments/order_missing/invoice",
+        headers=_auth_header(owner["access_token"]),
+    )
+    assert missing_order_invoice.status_code == 404, missing_order_invoice.text
+
+    forbidden_invoice = await client.get(
+        f"/api/v1/payments/{owner_order_id}/invoice",
+        headers=_auth_header(intruder["access_token"]),
+    )
+    assert forbidden_invoice.status_code in {403, 404}, forbidden_invoice.text
 
 
 @pytest.mark.asyncio

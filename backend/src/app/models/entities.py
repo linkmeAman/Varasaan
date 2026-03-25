@@ -68,6 +68,12 @@ class PaymentStatus(StrEnum):
     REFUNDED = "refunded"
 
 
+class EntitlementTier(StrEnum):
+    FREE = "free"
+    ESSENTIAL = "essential"
+    EXECUTOR = "executor"
+
+
 class MalwareScanStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
@@ -151,6 +157,8 @@ class User(Base):
     backup_recovery_email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     jurisdiction_code: Mapped[str] = mapped_column(String(8), default="IN")
     jurisdiction_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    entitlement_tier: Mapped[EntitlementTier] = mapped_column(Enum(EntitlementTier), default=EntitlementTier.FREE)
+    entitlement_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     password_changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
@@ -447,6 +455,7 @@ class Payment(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     order_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     payment_id: Mapped[str | None] = mapped_column(String(100), unique=True, index=True, nullable=True)
+    tier: Mapped[EntitlementTier | None] = mapped_column(Enum(EntitlementTier), nullable=True)
     amount_paise: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(12), nullable=False, default="INR")
     latest_status: Mapped[PaymentStatus] = mapped_column(Enum(PaymentStatus), default=PaymentStatus.CREATED)
@@ -454,6 +463,8 @@ class Payment(Base):
     last_event_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     unlocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     invoice_issued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    invoice_number: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    invoice_artifact_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

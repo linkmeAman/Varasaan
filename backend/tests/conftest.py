@@ -122,6 +122,7 @@ async def test_context(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("app.services.cases.get_aws_storage_crypto_service", lambda: fake_aws)
     monkeypatch.setattr("app.services.exports.get_aws_storage_crypto_service", lambda: fake_aws)
     monkeypatch.setattr("app.services.packets.get_aws_storage_crypto_service", lambda: fake_aws)
+    monkeypatch.setattr("app.services.payments.get_aws_storage_crypto_service", lambda: fake_aws)
     monkeypatch.setattr("app.services.documents.get_malware_scan_client", lambda: fake_malware)
 
     transport = ASGITransport(app=app)

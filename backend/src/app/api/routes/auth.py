@@ -320,4 +320,10 @@ async def confirm_jurisdiction(
 
 @router.get("/me", response_model=UserSessionResponse)
 async def me(user: User = Depends(get_current_user)) -> UserSessionResponse:
-    return UserSessionResponse(id=user.id, email=user.email, email_verified=user.email_verified)
+    return UserSessionResponse(
+        id=user.id,
+        email=user.email,
+        email_verified=user.email_verified,
+        entitlement_tier=user.entitlement_tier,
+        entitlement_updated_at=user.entitlement_updated_at,
+    )
