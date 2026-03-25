@@ -2,7 +2,9 @@ import crypto from 'node:crypto';
 
 import { expect, type APIRequestContext, type BrowserContext, type Page } from '@playwright/test';
 
-export const API_BASE_URL = process.env.PLAYWRIGHT_API_BASE_URL || 'http://localhost:8000';
+import { playwrightApiBaseUrl } from './env';
+
+export const API_BASE_URL = playwrightApiBaseUrl;
 const DEFAULT_PASSWORD = 'StrongPassw0rd!!123';
 
 export type TestUser = {
