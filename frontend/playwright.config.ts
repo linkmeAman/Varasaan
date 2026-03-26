@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test';
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
+import { playwrightBaseUrl } from './tests/e2e/env';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -17,7 +17,7 @@ export default defineConfig({
     ? [['github'], ['html', { open: 'never' }]]
     : [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL,
+    baseURL: playwrightBaseUrl,
     headless: true,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',

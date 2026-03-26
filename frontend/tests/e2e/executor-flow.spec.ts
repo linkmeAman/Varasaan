@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { playwrightApiBaseUrl, playwrightInternalApiKey } from './env';
 import { apiSignupVerifyLogin, createTestUser, extractTokenFromFeedback, loginThroughUi } from './helpers';
 
 const REVIEW_PENDING_CERTIFICATE = Buffer.from(
@@ -7,9 +8,10 @@ const REVIEW_PENDING_CERTIFICATE = Buffer.from(
   'utf-8',
 );
 const CLEAN_CERTIFICATE = Buffer.from('%PDF-1.1\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n', 'utf-8');
-const API_BASE_URL = process.env.PLAYWRIGHT_API_BASE_URL || 'http://localhost:8000';
-const INTERNAL_API_KEY = process.env.PLAYWRIGHT_INTERNAL_API_KEY || 'dev-internal-api-key';
-
+const CLEAN_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==',
+  'base64',
+);
 test('executor can activate a pending case and manage generated tasks', async ({ page, request }) => {
   const owner = createTestUser('executor-owner');
   const executor = createTestUser('executor-user');
@@ -70,8 +72,8 @@ test('executor can activate a pending case and manage generated tasks', async ({
   await expect(page).toHaveURL(/\/executor\/cases\//);
 
   await expect(page.locator('.executor-list-item').filter({ hasText: 'Dropbox' })).toHaveCount(1);
-  await expect(page.getByText('Subscription Bleed Stopper')).toBeVisible();
-  await expect(page.getByText('₹799.00')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Subscription Bleed Stopper' })).toBeVisible();
+  await expect(page.locator('.bleed-stopper-panel')).toContainText('₹799.00');
 
   await page.locator('#case-filter-category').selectOption('storage');
   await expect(page.locator('.executor-list-item')).toHaveCount(1);
@@ -80,6 +82,7 @@ test('executor can activate a pending case and manage generated tasks', async ({
 
   await page.locator('.executor-list-item').getByRole('button', { name: /Edit Task/i }).click();
   const dialog = page.getByRole('dialog');
+  const evidenceInput = dialog.locator('input[type="file"]');
   await dialog.getByLabel('Status').selectOption('submitted');
   await dialog.getByLabel('Reference Number').fill('REF-EXEC-001');
   await dialog.getByLabel('Submitted Date').fill('2026-03-21');
@@ -87,31 +90,37 @@ test('executor can activate a pending case and manage generated tasks', async ({
   await dialog.getByRole('button', { name: /Save Task/i }).click();
   await expect(page.getByText('Task updated.')).toBeVisible();
 
-  await dialog.getByLabel('Evidence File').setInputFiles({
+  await evidenceInput.setInputFiles({
     name: 'dropbox-proof-1.pdf',
     mimeType: 'application/pdf',
     buffer: Buffer.from('%PDF-1.1\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n', 'utf-8'),
   });
+  await expect(dialog.getByRole('button', { name: /Upload Evidence/i })).toBeEnabled();
   await dialog.getByRole('button', { name: /Upload Evidence/i }).click();
   await expect(dialog.getByText('dropbox-proof-1.pdf')).toBeVisible();
   await expect(dialog.getByText('Scan passed')).toBeVisible();
+  await dialog.getByRole('button', { name: /^Close$/ }).click();
 
-  await dialog.getByLabel('Evidence File').setInputFiles({
+  await page.locator('.executor-list-item').getByRole('button', { name: /Edit Task/i }).click();
+  const reopenedDialog = page.getByRole('dialog');
+  const reopenedEvidenceInput = reopenedDialog.locator('input[type="file"]');
+  await reopenedEvidenceInput.setInputFiles({
     name: 'dropbox-proof-2.png',
     mimeType: 'image/png',
-    buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    buffer: CLEAN_PNG,
   });
-  await dialog.getByRole('button', { name: /Upload Evidence/i }).click();
-  await expect(dialog.getByText('dropbox-proof-2.png')).toBeVisible();
-  await expect(dialog.getByRole('button', { name: /Download/i })).toHaveCount(2);
-  await dialog.getByRole('button', { name: /^Close$/ }).click();
+  await expect(reopenedDialog.getByRole('button', { name: /Upload Evidence/i })).toBeEnabled();
+  await reopenedDialog.getByRole('button', { name: /Upload Evidence/i }).click();
+  await expect(reopenedDialog.getByText('dropbox-proof-2.png')).toBeVisible();
+  await expect(reopenedDialog.getByRole('button', { name: /Download/i })).toHaveCount(2);
+  await reopenedDialog.getByRole('button', { name: /^Close$/ }).click();
 
   await page.getByRole('button', { name: /Subscription Bleed Stopper/i }).click();
   await expect(page).toHaveURL(/\/executor\/cases\/.+\/bleed-stopper/);
   await expect(page.getByRole('heading', { name: /Subscription Bleed Stopper/i })).toBeVisible();
-  await expect(page.getByText('Cancel card mandate and dispute debits')).toBeVisible();
+  await expect(page.locator('article')).toContainText('Cancel card mandate and dispute debits');
   await expect(page.getByText('Printable Card Dispute Template')).toBeVisible();
-  await expect(page.getByText('VISA 1234')).toBeVisible();
+  await expect(page.locator('article')).toContainText('VISA 1234');
 
   await page.evaluate(() => {
     (window as Window & { __bleedPrintCalls?: number }).__bleedPrintCalls = 0;
@@ -147,8 +156,9 @@ test('executor can activate a pending case and manage generated tasks', async ({
   await expect(page.getByRole('heading', { name: /Closure Report/i })).toBeVisible();
   await expect(page.getByText('Report ready')).toBeVisible();
   await expect(page.getByText('Case status: Active.')).toBeVisible();
-  await expect(page.getByText('dropbox-proof-1.pdf')).toBeVisible();
-  await expect(page.getByText('dropbox-proof-2.png')).toBeVisible();
+  const reportEvidenceList = page.locator('.executor-evidence-list').first();
+  await expect(reportEvidenceList).toContainText('dropbox-proof-1.pdf');
+  await expect(reportEvidenceList).toContainText('dropbox-proof-2.png');
 
   await page.evaluate(() => {
     (window as Window & { __printCalls?: number }).__printCalls = 0;
@@ -160,8 +170,8 @@ test('executor can activate a pending case and manage generated tasks', async ({
   await expect.poll(async () => page.evaluate(() => (window as Window & { __printCalls?: number }).__printCalls || 0)).toBe(1);
 
   await page.getByRole('button', { name: /Close Case/i }).click();
-  await expect(page.getByText('Case closed and evidence retention scheduled.')).toBeVisible();
-  await expect(page.getByText('Case status: Closed.')).toBeVisible();
+  await expect(page.locator('.inventory-feedback').filter({ hasText: 'Case closed and evidence retention scheduled.' }).first()).toBeVisible();
+  await expect(page.locator('.report-readiness-copy').first()).toContainText('Case status: Closed.');
 
   await page.getByRole('button', { name: /Back to Workspace/i }).click();
   await expect(page.getByText(/This case is closed/i)).toBeVisible();
@@ -217,16 +227,17 @@ test('executor sees pending review and rejected review states, then uploads a re
   });
   await page.getByRole('button', { name: /Upload and Activate/i }).click();
   await expect(page).toHaveURL(/\/executor\/cases\//);
-  await expect(page.getByText('Pending review')).toBeVisible();
-  await expect(page.getByText(/manual review/i)).toBeVisible();
-  await expect(page.getByText(/death certificate metadata detected/i)).toBeVisible();
+  const reviewPanel = page.locator('.inventory-panel.executor-section').first();
+  await expect(page.locator('.executor-task-readonly')).toContainText('Pending review');
+  await expect(reviewPanel).toContainText(/manual review/i);
+  await expect(reviewPanel).toContainText(/death certificate metadata detected/i);
 
   const caseId = new URL(page.url()).pathname.split('/').at(-1);
   expect(caseId).toBeTruthy();
 
-  const rejectResponse = await request.post(`${API_BASE_URL}/api/v1/internal/case-reviews/${caseId}/reject`, {
+  const rejectResponse = await request.post(`${playwrightApiBaseUrl}/api/v1/internal/case-reviews/${caseId}/reject`, {
     headers: {
-      'X-Internal-Api-Key': INTERNAL_API_KEY,
+      'X-Internal-Api-Key': playwrightInternalApiKey,
     },
     data: {
       reason: 'metadata_mismatch',
@@ -239,7 +250,7 @@ test('executor sees pending review and rejected review states, then uploads a re
   const rejectedCard = page.locator('.executor-case-card').filter({ hasText: owner.email }).first();
   await expect(rejectedCard).toContainText('Rejected review');
   await expect(page.getByText('metadata mismatch')).toBeVisible();
-  await expect(page.getByText(/replacement certificate/i)).toBeVisible();
+  await expect(page.getByLabel('Replacement Certificate PDF')).toBeVisible();
 
   await page.getByLabel('Replacement Certificate PDF').setInputFiles({
     name: 'replacement-certificate.pdf',
@@ -248,6 +259,6 @@ test('executor sees pending review and rejected review states, then uploads a re
   });
   await page.getByRole('button', { name: /Upload Replacement Certificate/i }).click();
   await expect(page).toHaveURL(/\/executor\/cases\//);
-  await expect(page.getByText('Active case')).toBeVisible();
+  await expect(page.locator('.status-badge.live')).toContainText('Active case');
   await expect(page.locator('.executor-list-item').filter({ hasText: 'Dropbox' })).toHaveCount(1);
 });
