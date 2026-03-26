@@ -74,6 +74,7 @@ async def create_user(db: AsyncSession, payload: SignupRequest, client_ip: str |
         full_name=payload.full_name,
         phone=payload.phone,
         jurisdiction_code=payload.jurisdiction_code,
+        entitlement_updated_at=datetime.now(UTC),
         email_verification_token_hash=hash_token(verification_token),
         email_verification_expires_at=datetime.now(UTC) + timedelta(hours=24),
     )

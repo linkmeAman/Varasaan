@@ -61,6 +61,13 @@ class Settings(BaseSettings):
     razorpay_webhook_secret: str = "dev-razorpay-secret"
     razorpay_key_id: str | None = None
 
+    invoice_seller_name: str = "Varasaan Technologies Private Limited"
+    invoice_seller_address: str = "Bengaluru, Karnataka, India"
+    invoice_seller_gstin: str = "00AAAAA0000A1Z5"
+    invoice_place_of_supply: str = "Karnataka"
+    invoice_seller_state_code: str = "29"
+    invoice_support_email: str = "support@varasaan.local"
+
     email_provider: Literal["log", "postmark"] = "log"
     email_from_address: str = "no-reply@varasaan.local"
     postmark_server_token: str | None = None

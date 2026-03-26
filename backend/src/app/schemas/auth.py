@@ -1,8 +1,9 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
-from app.models import PolicyType
+from app.models import EntitlementTier, PolicyType
 
 
 class ConsentInput(BaseModel):
@@ -78,6 +79,8 @@ class UserSessionResponse(BaseModel):
     id: str
     email: EmailStr
     email_verified: bool
+    entitlement_tier: EntitlementTier
+    entitlement_updated_at: datetime | None = None
 
 
 class RecoveryRequestResponse(BaseModel):
